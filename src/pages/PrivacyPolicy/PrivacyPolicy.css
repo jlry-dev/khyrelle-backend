@@ -1,0 +1,68 @@
+/* PrivacyPolicy.css */
+
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap');
+
+.privacy-container {
+  font-family: 'VT323', monospace;
+  max-width: 2000px;
+  margin: 0 auto;
+  padding: 50px 30px;
+  background-image: url('../../assets/bg1.png');
+  background-position: center;
+  color: #ffffff;
+  image-rendering: pixelated;
+}
+
+.privacy-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.privacy-header h1 {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 2rem;
+  text-transform: uppercase;
+  color: #ffffff;
+  text-shadow: 2px 2px 0px #000;
+  letter-spacing: 1px;
+}
+
+.privacy-content {
+  background-color: rgba(0, 0, 0, 0.4);
+  border: 4px solid #222;
+  padding: 30px;
+  box-shadow: 6px 6px 0px #000;
+  image-rendering: pixelated;
+}
+
+.privacy-content p,
+.privacy-content li {
+  font-size: 1.4rem;
+  line-height: 1.8;
+  margin-bottom: 20px;
+}
+
+.privacy-content h2 {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 1.3rem;
+  color: #ffa500;
+  text-transform: uppercase;
+  border-left: 5px solid #138e22;
+  padding-left: 10px;
+  margin-bottom: 15px;
+}
+
+@media (max-width: 768px) {
+  .privacy-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .privacy-content p,
+  .privacy-content li {
+    font-size: 1.2rem;
+  }
+
+  .privacy-content h2 {
+    font-size: 1rem;
+  }
+}

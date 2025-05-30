@@ -1,0 +1,116 @@
+@font-face {
+  font-family: 'MyFont';
+  src: url('../../assets/font/static/PixelifySans-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+.terms-container {
+  font-family: 'MyFont', monospace;
+  max-width: 2000px;
+  margin: 0 auto;
+  padding: 50px 30px;
+  background-image: url('../../assets/bg1.png');
+  background-size: cover;
+  background-position: center;
+  color: #ffffff;
+  image-rendering: pixelated;
+}
+
+.terms-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.terms-header h1 {
+  font-family: 'MyFont', cursive;
+  font-size: 3rem;
+  color: #ffffff;
+  text-shadow: 2px 2px 0px #000;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.terms-content {
+  background-color: rgba(0, 0, 0, 0.4);
+  border: 4px solid #222;
+  padding: 30px;
+  image-rendering: pixelated;
+  box-shadow: 6px 6px 0px #000;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 30px;
+}
+
+.checkbox-row input[type="checkbox"] {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 3px solid #483030;
+  background-color: #fff;
+  margin-right: 15px;
+  cursor: pointer;
+  position: relative;
+  image-rendering: pixelated;
+}
+
+.checkbox-row input[type="checkbox"]:checked::before {
+  content: '✔';
+  position: absolute;
+  top: -10px;
+  left: 1px;
+  font-size: 1.5rem;
+  color: #138e22;
+}
+
+.checkbox-label {
+  font-size: 1.3rem;
+  color: #f7f1f1;
+  line-height: 1.8;
+}
+
+.terms-content h2 {
+  font-family: 'MyFont', cursive;
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+  color: #ffa500;
+  text-transform: uppercase;
+  border-left: 5px solid #138e22;
+  padding-left: 10px;
+}
+
+.terms-content ul {
+  list-style-type: square;
+  padding-left: 20px;
+}
+
+.terms-content li {
+  font-size: 1.3rem;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.link {
+  color: #4a6cf7;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+@media (max-width: 768px) {
+  .terms-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .checkbox-label,
+  .terms-content li {
+    font-size: 1.1rem;
+  }
+
+  .terms-content h2 {
+    font-size: 1.1rem;
+  }
+}

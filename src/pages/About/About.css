@@ -1,0 +1,169 @@
+
+/* Base Styles */
+.about-page {
+  padding: 50px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  color: white;
+  text-align: center;
+  font-family: 'MyFont', sans-serif; /* Fallback added */
+}
+
+/* Typography */
+.section-title {
+  font-size: 2rem;
+  margin-bottom: 15px;
+  color: #ffcf48;
+  text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+}
+
+.section-heading {
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+  color: #ffcf48;
+}
+
+.description {
+  max-width: 800px;
+  margin: 0 auto;
+  line-height: 1.6;
+  font-size: 1.1rem;
+}
+
+/* Mission/Vision Tabs  */
+.mission-vision-container {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  flex-wrap: wrap;
+  margin-bottom: 30px;
+}
+
+.mission-box,
+.vision-box {
+  flex: 1;
+  min-width: 300px;
+  max-width: 500px;
+  text-align: left;
+  border: 12px solid transparent;
+  border-image: url('../../assets/bg2.png') 12 round;
+  image-rendering: pixelated;
+  background-color: rgba(62, 67, 46, 0.52);
+  border-radius: 10px;
+  padding: 25px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.mission-box.active,
+.vision-box.active {
+  background-color: rgba(109, 140, 69, 0.6);
+  box-shadow: 0 0 15px rgba(255, 207, 72, 0.3);
+}
+
+/* Focus states for accessibility */
+.mission-box:focus,
+.vision-box:focus {
+  outline: 2px solid #ffcf48;
+  outline-offset: 2px;
+}
+
+/* Contact & Social Section */
+.contact-social-container {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  flex-wrap: wrap;
+}
+
+.contact-box,
+.social-box {
+  flex: 1;
+  min-width: 300px;
+  border: 12px solid transparent;
+  border-image: url('../../assets/bg2.png') 12 round;
+  image-rendering: pixelated;
+  background-color: rgba(62, 67, 46, 0.52);
+  border-radius: 10px;
+  padding: 25px;
+  text-align: left;
+}
+
+.contact-list {
+  list-style: none;
+  padding: 0;
+  line-height: 1.8;
+}
+
+.contact-list li {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(109, 140, 69, 0.3);
+}
+
+/* Social Media Grid */
+.about-socials {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.social-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: white;
+  text-decoration: none;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: rgba(62, 67, 46, 0.3);
+  transition: background-color 0.3s ease;
+}
+
+.social-item:hover {
+  background-color: rgba(109, 140, 69, 0.2);
+}
+
+.social-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.social-text p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.social-text p:first-child {
+  font-weight: bold;
+  color: #ffcf48;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .about-page {
+    padding: 30px 20px;
+  }
+
+  .mission-box,
+  .vision-box,
+  .contact-box,
+  .social-box {
+    min-width: 100%;
+  }
+
+  .about-socials {
+    grid-template-columns: 1fr;
+  }
+
+  .contact-list,
+  .contact-box {
+    text-align: center;
+  }
+}

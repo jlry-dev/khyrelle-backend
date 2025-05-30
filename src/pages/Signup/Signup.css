@@ -1,0 +1,165 @@
+/* Signup.css - Identical to Login.css */
+@font-face {
+  font-family: 'PixelFont';
+  src: url('../../assets/font/static/PixelifySans-Regular.ttf') format('truetype');
+}
+
+/* === IDENTICAL PAGE STRUCTURE === */
+.signup-page-content {
+  width: 100%;
+  min-height: 100vh;
+  background: url('../../assets/bg1.png') no-repeat center center fixed;
+  background-size: cover;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'PixelFont', monospace;
+  image-rendering: pixelated;
+  padding: 20px;
+}
+
+.welcome-message {
+  font-size: 32px;
+  color: #fff;
+  text-shadow: 4px 4px 0 #000;
+  margin-bottom: 40px;
+  letter-spacing: 1px;
+}
+
+.signup-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 80px; /* Same exact gap */
+}
+
+/* === PIXEL-PERFECT FORM BOX === */
+.signup-form-container {
+  background-color: rgba(248, 218, 160, 0.9);
+  border: 8px solid #8c6239;
+  padding: 30px;
+  box-shadow: 10px 10px 0 rgba(0,0,0,0.3);
+  width: 380px; /* Same width */
+}
+
+.signup-form-container h2 {
+  color: #422a1e;
+  text-align: center;
+  margin-bottom: 25px;
+  font-size: 24px; /* Same size */
+  text-transform: uppercase;
+}
+
+/* === LOGIN-STYLE FORM (SINGLE COLUMN) === */
+.signup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* Same spacing */
+}
+
+.form-group input {
+  width: 100%;
+  padding: 12px;
+  background-color: #f8edd7;
+  border: 4px solid #8c6239;
+  font-family: 'PixelFont', monospace;
+  font-size: 16px; /* Same input style */
+}
+
+/* === IDENTICAL BUTTON === */
+.submit-button {
+  background-color: #ff5722;
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  font-family: 'PixelFont', monospace;
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.3);
+  transition: all 0.1s;
+  width: 100%;
+}
+
+.submit-button:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+}
+
+/* === MATCHING LINK STYLE === */
+.login-link {
+  text-align: center;
+  margin-top: 15px;
+}
+
+.login-link a {
+  color: #422a1e;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+/* === IDENTICAL CHARACTER & BUBBLE === */
+.character-container {
+  position: relative;
+  width: 280px;
+  height: 400px;
+}
+
+.character-bubble {
+  position: absolute;
+  top: -100px;
+  left: -200px;
+  width: 250px;
+  height: 120px;
+  background: url('../../assets/bubble.png') no-repeat;
+  background-size: contain;
+  image-rendering: pixelated;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 20px;
+  animation: float 3s ease-in-out infinite;
+}
+
+.character-bubble p {
+  color: #000;
+  font-size: 16px;
+  text-align: center;
+}
+
+.pixel-character {
+  width: 280px;
+  height: 380px;
+  background: url('../../assets/guide.png') no-repeat center bottom;
+  background-size: contain;
+  image-rendering: pixelated;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) translateX(-5px); }
+  50% { transform: translateY(-10px) translateX(5px); }
+}
+
+/* === IDENTICAL MOBILE LAYOUT === */
+@media (max-width: 900px) {
+  .signup-wrapper {
+    flex-direction: column;
+    gap: 40px;
+  }
+  
+  .character-container {
+    order: -1;
+    height: 300px;
+    margin-bottom: 40px;
+  }
+  
+  .character-bubble {
+    top: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
+  .pixel-character {
+    width: 220px;
+    height: 300px;
+  }
+}

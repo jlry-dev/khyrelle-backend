@@ -1,0 +1,10 @@
+.product-image img {
+  width: 100%;
+  max-width: 180px;  /* or whatever size looks best */
+  height: auto;
+  object-fit: cover;
+  display: block;
+  margin: 0 auto;
+  border-radius: 8px;
+}
+    

@@ -1,0 +1,201 @@
+@font-face {
+  font-family: 'MyFont';
+  src: url('../../assets/font/static/PixelifySans-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+.the-header {
+  font-family: 'MyFont';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 999;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: transparent;
+  padding: 15px 0px;
+  color: black;
+  border: none;
+  box-shadow: none;
+}
+
+.the-header-left,
+.the-header-right {
+  padding: 0 15px;
+}
+
+.the-header-left {
+  display: flex;
+  align-items: center;
+}
+
+.home-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: white;
+}
+
+.logo {
+  width: 40px;
+  margin-right: 10px;
+}
+
+.site-title {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.the-header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 20px;
+  padding: 5px 10px;
+  transition: box-shadow 0.3s ease;
+}
+
+.search-bar input {
+  border: none;
+  outline: none;
+  padding: 5px 10px;
+  border-radius: 20px;
+  width: 180px;
+}
+
+.search-bar button {
+  background: none;
+  border: none;
+  color: #616F39;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-bar:hover {
+  box-shadow: 0 0 8px #00ff00;
+}
+
+.cart-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.cart-icon {
+  width: 28px;
+  height: 28px;
+  stroke: white;
+  transition: stroke 0.3s ease, filter 0.3s ease, transform 0.3s ease;
+}
+
+.cart-btn:hover .cart-icon {
+  stroke: #00FF7F; /* Bright green */
+  filter: drop-shadow(0 0 5px #00FF7F);
+  transform: scale(1.2);
+}
+
+
+.profile-container {
+  position: relative;
+}
+
+.profile-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.profile-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  transition: stroke 0.3s ease, filter 0.3s ease, transform 0.3s ease;
+}
+
+.profile-icon:hover {
+  box-shadow: 0 0 10px #00ff00; 
+  filter: drop-shadow(0 0 5px #c0ffe0);
+}
+
+/* Updated dropdown styling */
+.profile-dropdown {
+  position: absolute;
+  right: 0;
+  top: 40px;
+  background: white;
+  color: black;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  width: 200px;
+  text-align: center;
+}
+
+/* Styled name */
+.profile-name {
+  font-size: 18px;
+  font-weight: bold;
+  transition: color 0.3s, text-shadow 0.3s;
+}
+
+.profile-name:hover {
+  color: #006400;
+  text-shadow: 0 0 5px #006400;
+}
+
+/* Styled email */
+.profile-email {
+  font-size: 14px;
+  font-style: italic;
+  margin: 5px 0 15px;
+  color: #333;
+}
+
+/* Styled logout button */
+.logout-btn {
+  width: 100%;
+  padding: 10px;
+  background: #616F39;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s, color 0.3s;
+}
+
+.logout-btn:hover {
+  box-shadow: 0 0 8px #006400;
+}
+
+.logout-btn:active {
+  background: white;
+  color: #006400;
+}
+
+.site-title {
+  font-size: 24px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  color: white;
+}
+
+.site-title:hover {
+  color: rgb(7, 233, 30);
+  text-shadow: 0 0 18px #00f700;
+}

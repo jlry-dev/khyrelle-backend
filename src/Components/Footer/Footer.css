@@ -1,0 +1,152 @@
+@font-face {
+  font-family: 'MyFont';
+  src: url('../../assets/font/static/PixelifySans-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+body {
+  background-color: black;
+}
+
+.footer-container {
+  font-family: 'MyFont';
+  width: 100%;
+  color: rgb(255, 255, 255);
+  display: flex;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  background-color: transparent;
+  padding: 0;
+  margin: 0;
+}
+
+.footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  max-width: 1200px;
+  width: 100%;
+  padding: 5px;
+  margin: 0;
+  background-color: transparent;
+}
+
+
+
+/* Left: Links section */
+.footer-links {
+  display: flex;
+  gap: 40px;
+}
+
+.link-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Center: Socials and copyright */
+.footer-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.social-icons {
+  display: flex;
+  gap: 15px;
+}
+
+.social-icons a {
+  color: rgb(255, 255, 255);
+  font-size: 20px;
+  transition: color 0.3s ease, transform 0.3s ease;
+}
+
+.social-icons a:hover {
+  color: rgb(188, 150, 109);
+  transform: scale(1.2);
+}
+
+.copyright {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Right: Payment section */
+.footer-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.payment-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.payment-section span {
+  font-size: 14px;
+}
+
+/* Make sure icons display correctly */
+.payment-section img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  padding: 2px;
+  background-color: transparent;
+  border: none;
+  display: block;
+}
+
+.payment-section a img {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border-radius: 4px;
+}
+
+.payment-section a:hover img {
+  transform: scale(1.1);
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Links */
+.footer-container a {
+  color: rgb(255, 255, 255);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.footer-container a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .footer-content {
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+    padding: 20px;
+  }
+
+  .footer-links {
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .footer-center,
+  .footer-right {
+    align-items: center;
+  }
+
+  .footer-right {
+    margin-top: 20px;
+  }
+}
