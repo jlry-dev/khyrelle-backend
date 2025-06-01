@@ -21,8 +21,6 @@ import Login from './pages/Login/Login.js';
 import Home from './pages/Home/Home.js';
 import Signup from './pages/Signup/Signup.js';
 import { AuthProvider } from './data/AuthProvider'; // Adjust path
-import SearchResultsPage from './pages/SearchResultsPage/SearchResultsPage'; // Adjust path
-
 // Import background images
 
 import defaultBg from './assets/bg2.png';
@@ -96,7 +94,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/about" element={<About />} />
-              <Route path="/search" element={<SearchResultsPage />} />
+    
 
               <Route path="/contact" element={<Contact />} />
               <Route path="/search" element={<Search />} />

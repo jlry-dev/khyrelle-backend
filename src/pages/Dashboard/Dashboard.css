@@ -8,75 +8,94 @@
   font-style: normal;
 }
 
-/* Apply base styles to html and body for consistency */
-html, body {
+ds-body {
   font-family: 'MyFont', sans-serif;
-  color: #f7deaa; /* Default text color for the dashboard area */
-  background-color: #000000; /* Fallback background, can help prevent white flash */
+  color: #f7deaa;
+  background-color: var(--darker-bg);
   line-height: 1.6;
-  margin: 0; /* Remove default margin */
-  padding: 0; /* Remove default padding */
-  overflow-x: hidden; /* Prevent horizontal scroll on body */
+  margin: 20;
+  overflow-x: hidden;
 }
 
-/* This container is likely on a div wrapping the entire DashboardPage component in App.js or DashboardPage itself */
-.ds-dashboard-container { /* Renamed from .dashboard-container for clarity if it's specific to dashboard page */
+/* Remove any potential white flash */
+ds-html, ds-body {
+  background-color: #000000;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes dots {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60% { content: '...'; }
+  80%, 100% { content: ''; }
+}
+
+.zoomed-full-image {
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  filter: brightness(0.6) contrast(1.1);
+}
+
+.dashboard-container {
   min-height: 100vh;
-  /* Background is handled by BackgroundWrapper in App.js, 
-     but if you want a specific overlay for the dashboard page itself, use this: */
+  background-image: url('../../assets/cloud1.png');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-attachment: fixed;
   position: relative;
-  display: flex; /* If DashboardPage component is the direct child and needs to fill height */
-  flex-direction: column;
 }
 
-/* This overlay can be used if BackgroundWrapper isn't sufficient or for a dashboard-specific tint */
-.ds-dashboard-container::before {
+.dashboard-container::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(to bottom, rgba(42, 58, 42, 0.5) 0%, rgba(26, 34, 26, 0.7) 100%); /* Adjusted opacity */
-  z-index: 0; /* Ensure it's behind content */
+  background: linear-gradient(to bottom, rgba(42, 58, 42, 0.7) 0%, rgba(26, 34, 26, 0.9) 100%);
+  z-index: 0;
 }
 
-/* Main layout for sidebar and content area - Corrected selector */
-.ds-dashboard-layout { /* Was .ds-dashboard-content in your CSS */
+.ds-dashboard-content {
   display: flex;
-  padding: 20px; /* Reduced padding for better responsiveness */
-  gap: 30px;    /* Reduced gap */
+  padding: 100px;
+  gap: 50px;
   position: relative;
-  z-index: 1; /* Ensure content is above the ::before overlay */
-  flex-grow: 1; /* Allow this to take available space if ds-dashboard-container is flex */
-  max-width: 1400px; /* Optional: max-width for larger screens */
-  margin: 0 auto; /* Center content if max-width is used */
+  z-index: 1;
 }
 
-/* Enhanced Sidebar */
+/* Enhanced Sidebar with subtle glow */
 .ds-sidebar {
-  width: 260px; /* Slightly reduced width */
-  flex-shrink: 0; /* Prevent sidebar from shrinking */
+  width: 280px;
   display: flex;
   flex-direction: column;
-  gap: 20px; /* Space between nav container and branding */
+  gap: 40px;
   animation: fadeIn 0.8s ease-out;
-  height: fit-content; /* Make sidebar height adapt to its content */
 }
 
 .ds-nav-container {
-  background-color: #3a4a3a; /* Darker, more saturated green */
-  border-radius: 15px; /* Softened radius */
+  background-color: #3a4a3a;
+  border-radius: 20px;
   padding: 20px;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3), 
-              0 0 10px rgba(107, 178, 110, 0.1); /* Adjusted glow */
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), 
+              0 0 15px rgba(137, 206, 140, 0.1);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .ds-nav-container:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 7px 25px rgba(0, 0, 0, 0.35), 
-              0 0 15px rgba(107, 178, 110, 0.2);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25), 
+              0 0 20px rgba(137, 206, 140, 0.15);
 }
 
 .ds-nav-menu {
@@ -86,14 +105,14 @@ html, body {
 }
 
 .ds-nav-menu li {
-  padding: 12px 18px; /* Slightly more padding */
+  padding: 12px 15px;
   margin: 8px 0;
-  border-radius: 10px; /* Softened radius */
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.25s ease-in-out;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
-  color: #e0e0e0; /* Lighter text for better contrast */
+  color: #ffffff;
   position: relative;
   overflow: hidden;
 }
@@ -105,8 +124,8 @@ html, body {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(137, 206, 140, 0.15), transparent); /* Subtle green sheen */
-  transition: all 0.4s ease;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: all 0.5s ease;
 }
 
 .ds-nav-menu li:hover::before {
@@ -114,95 +133,79 @@ html, body {
 }
 
 .ds-nav-menu li:hover {
-  background-color: rgba(137, 206, 140, 0.1); /* Light green tint on hover */
-  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .ds-nav-menu li.active {
-  background-color: #5a6d5a; /* More distinct active state */
+  background-color: #5a6d5a;
   color: #ffffff;
-  font-weight: bold; /* Emphasize active link */
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
 }
 
-.ds-nav-icon { /* Applied to the icon span */
+.ds-nav-icon {
   margin-right: 12px;
   font-size: 1.2rem;
-  color: #89ce8c; /* Green icon color */
+  color: #ffffff;
 }
 
-.logout-btn-sidebar { /* Specific class for logout in sidebar */
+.logout-btn {
   margin-top: 20px;
-  color: #ff9e9e !important; /* Ensure this overrides general li color */
+  color: #ff9e9e;
+  transition: all 0.3s ease;
 }
-.logout-btn-sidebar:hover {
-  background-color: rgba(255, 158, 158, 0.1) !important; /* Specific hover for logout */
+
+.logout-btn:hover {
   text-shadow: 0 0 8px rgba(255, 158, 158, 0.6);
 }
 
-
-/* Sidebar Footer and Branding */
-.ds-sidebar-footer {
-    margin-top: auto; /* Pushes to the bottom if sidebar is flex column */
-    padding-top: 20px;
-}
-
-.sidebar-cloud-bg { /* For the cloud image within the sidebar footer */
-    width: 100%;
-    max-height: 150px; /* Control its height */
-    object-fit: cover; /* Or contain, depending on desired effect */
-    opacity: 0.3; /* Make it subtle */
-    border-radius: 0 0 15px 15px; /* If you want it to blend with forge-branding */
-}
-
 .forge-branding {
-  background-color: rgba(40, 52, 40, 0.7); /* Slightly different from nav */
-  border-radius: 15px;
+  background-color: rgba(58, 74, 58, 0.8);
+  border-radius: 20px;
   padding: 20px;
-  text-align: center;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(137, 206, 140, 0.2);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(137, 206, 140, 0.3);
+  transition: all 0.3s ease;
+}
+
+.forge-branding:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25), 
+              0 0 15px rgba(137, 206, 140, 0.2);
 }
 
 .forge-branding h3 {
   margin-top: 0;
-  margin-bottom: 5px;
-  color: #89ce8c; /* Green title */
-  text-shadow: 0 0 6px rgba(137, 206, 140, 0.4);
-}
-.forge-branding p {
-    font-size: 0.85em;
-    color: #c0c0c0;
-    margin-bottom: 0;
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(137, 206, 140, 0.5);
 }
 
-
-/* Main Content Area - Corrected selector */
-.ds-main-content-area { /* Was .ds-main-content in your CSS */
-  flex: 1; /* Allows it to take remaining space */
-  background-color: rgba(30, 30, 30, 0.6); /* Darker, less green for content background */
-  border-radius: 15px;
+.ds-main-content {
+  flex: 1;
+  background-color: rgba(43, 43, 43, 0.7);
+  border-radius: 20px;
   padding: 25px;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
-  color: #e0e0e0; /* Lighter default text for content */
-  border: 1px solid rgba(137, 206, 140, 0.2); /* Subtle green border */
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), 
+              0 0 15px rgba(137, 206, 140, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(137, 206, 140, 0.3);
   animation: fadeInUp 0.8s ease-out;
 }
 
-/* Card styles with enhanced glow effect (Applied to various cards) */
+/* Card styles with enhanced glow effect */
 .stat-card,
 .order-card,
 .profile-card,
 .address-card,
-.activity-item { /* Removed .wishlist-item, .offer-card if not used */
-  background-color: rgba(45, 45, 45, 0.6); /* Slightly lighter card background */
-  border: 1px solid #5a6d5a; /* Greenish border */
-  border-radius: 12px; /* Softer radius */
+.wishlist-item,
+.offer-card,
+.activity-item {
+  background-color: rgba(40, 40, 40, 0.5);
+  border: 2px solid #a5d6a7;
+  border-radius: 15px;
   padding: 20px;
   margin-bottom: 20px;
-  backdrop-filter: blur(4px); /* Subtle blur */
+  backdrop-filter: blur(5px);
   transition: all 0.3s ease;
-  color: #e0e0e0;
+  color: #ffffff;
   position: relative;
   overflow: hidden;
 }
@@ -211,12 +214,17 @@ html, body {
 .order-card::after,
 .profile-card::after,
 .address-card::after,
+.wishlist-item::after,
+.offer-card::after,
 .activity-item::after {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  border-radius: 11px; /* Inner radius */
-  box-shadow: inset 0 0 12px rgba(107, 178, 110, 0.15); /* More subtle inner glow */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 13px;
+  box-shadow: inset 0 0 15px rgba(137, 206, 140, 0.2);
   pointer-events: none;
 }
 
@@ -224,164 +232,663 @@ html, body {
 .order-card:hover,
 .profile-card:hover,
 .address-card:hover,
+.wishlist-item:hover,
+.offer-card:hover,
 .activity-item:hover {
-  transform: translateY(-4px) scale(1.01); /* Subtle lift and scale */
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25), 
-              0 0 18px rgba(137, 206, 140, 0.25);
-  border-color: #a5d6a7; /* Brighter green border on hover */
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2), 
+              0 0 20px rgba(137, 206, 140, 0.2);
+  border-color: #89ce8c;
 }
 
 /* Stats container */
-.stats-container { display: flex; gap: 20px; margin: 20px 0; }
+.stats-container {
+  display: flex;
+  gap: 20px;
+  margin: 20px 0;
+}
+
 .stat-card {
   flex: 1;
   text-align: center;
-  background: linear-gradient(135deg, rgba(58, 74, 58, 0.5) 0%, rgba(40, 52, 40, 0.7) 100%);
+  background: linear-gradient(135deg, rgba(58, 74, 58, 0.6) 0%, rgba(40, 52, 40, 0.8) 100%);
 }
-.stat-number {
-  font-size: 2.2rem; /* Slightly smaller */
-  font-weight: bold;
-  margin: 8px 0;
-  color: #ffffff;
-  text-shadow: 0 0 8px rgba(137, 206, 140, 0.5);
-}
-.stat-card h3 { font-size: 1.1rem; margin-bottom: 5px; color: #a5d6a7;}
-.stat-card p { color: #c0c0c0; font-size: 0.9rem; }
 
+.stat-number {
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin: 10px 0;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(137, 206, 140, 0.5);
+}
+
+.stat-card p {
+  color: #e0e0e0;
+}
 
 /* Order cards */
-.order-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
-.order-header h3 { margin-bottom: 5px; font-size: 1.2rem; }
-.order-header p { font-size: 0.85rem; margin: 2px 0; color: #c0c0c0; }
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+  color: #ffffff;
+}
 
-.order-status { padding: 5px 12px; border-radius: 15px; font-weight: bold; text-transform: uppercase; font-size: 0.75rem; }
-.status-completed { background-color: rgba(46, 125, 50, 0.3); color: #a5d6a7; border: 1px solid #a5d6a7;}
-.status-shipped { background-color: rgba(2, 119, 189, 0.3); color: #90caf9; border: 1px solid #90caf9;}
-.status-processing { background-color: rgba(245, 124, 0, 0.3); color: #ffcc80; border: 1px solid #ffcc80;}
-.status-pending { background-color: rgba(108, 117, 125, 0.3); color: #ced4da; border: 1px solid #ced4da; }
-.status-cancelled { background-color: rgba(220, 53, 69, 0.3); color: #f5c6cb; border: 1px solid #f5c6cb; }
+.order-status {
+  padding: 5px 15px;
+  border-radius: 20px;
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
 
+.status-completed {
+  background-color: rgba(46, 125, 50, 0.2);
+  color: #a5d6a7;
+}
 
-.order-items { margin: 15px 0; }
-.order-items h4 { font-size: 0.9rem; color: #a5d6a7; margin-bottom: 8px; }
-.order-item-summary { display: flex; align-items: center; font-size: 0.85rem; margin-bottom: 5px; color: #d0d0d0; }
-.order-item-image-sm { width: 40px; height: 40px; object-fit: contain; margin-right: 10px; border-radius: 4px; background-color: rgba(255,255,255,0.1); }
-.order-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
+.status-shipped {
+  background-color: rgba(2, 119, 189, 0.2);
+  color: #90caf9;
+}
 
-/* Buttons */
+.status-processing {
+  background-color: rgba(245, 124, 0, 0.2);
+  color: #ffcc80;
+}
+
+.order-items {
+  margin: 15px 0;
+}
+
+.order-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  color: #ffffff;
+  transition: all 0.3s ease;
+}
+
+.order-item:hover {
+  transform: translateX(5px);
+}
+
+.item-image {
+  width: 60px;
+  height: 60px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  margin-right: 15px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.order-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Buttons with enhanced effects */
 .primary-button,
 .secondary-button {
-  padding: 8px 18px; /* Adjusted padding */
-  border-radius: 8px; /* Sharper radius */
+  padding: 10px 20px;
+  border-radius: 25px;
   border: none;
   cursor: pointer;
   font-weight: bold;
-  transition: all 0.25s ease;
-  font-family: 'MyFont', sans-serif; /* Ensure font */
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
 }
-.primary-button { background-color: #5a6d5a; color: white !important; box-shadow: 0 3px 8px rgba(90, 109, 90, 0.25); }
-.primary-button:hover { background-color: #6b826b; transform: translateY(-1px); box-shadow: 0 5px 12px rgba(90, 109, 90, 0.35); }
-.secondary-button { background-color: transparent; color: #a5d6a7 !important; border: 1px solid #a5d6a7; }
-.secondary-button:hover { background-color: rgba(137, 206, 140, 0.1); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(137, 206, 140, 0.15); }
 
+.primary-button {
+  background-color: #5a6d5a;
+  color: white;
+  box-shadow: 0 4px 10px rgba(90, 109, 90, 0.3);
+}
+
+.primary-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: all 0.5s ease;
+}
+
+.primary-button:hover::before {
+  left: 100%;
+}
+
+.primary-button:hover {
+  background-color: #6b826b;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(90, 109, 90, 0.4);
+}
+
+.secondary-button {
+  background-color: transparent;
+  color: #ffffff;
+  border: 1px solid #ffffff;
+}
+
+.secondary-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(255, 255, 255, 0.1);
+}
 
 /* Profile section */
-.profile-card { display: flex; gap: 30px; background: none; /* Remove duplicate background if card has its own */ }
-.profile-avatar { text-align: center; }
-.avatar-placeholder { width: 120px; height: 120px; border-radius: 50%; background-color: rgba(255, 255, 255, 0.05); margin-bottom: 15px; border: 2px solid #5a6d5a; }
-.profile-form { flex: 1; }
-.form-group { margin-bottom: 18px; }
-.form-group label { display: block; margin-bottom: 6px; color: #a5d6a7; font-size: 0.9rem; }
+.profile-card {
+  display: flex;
+  gap: 30px;
+  background: linear-gradient(135deg, rgba(58, 74, 58, 0.6) 0%, rgba(40, 52, 40, 0.8) 100%);
+}
+
+.profile-avatar {
+  text-align: center;
+  color: #ffffff;
+}
+
+.avatar-placeholder {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.1);
+  margin-bottom: 15px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 20px rgba(137, 206, 140, 0.3);
+}
+
+.profile-form {
+  flex: 1;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  color: #e0e0e0;
+}
+
 .form-group input {
   width: 100%;
   padding: 10px;
-  border-radius: 6px;
-  border: 1px solid #4a5a4a; /* Darker border */
-  background-color: rgba(0, 0, 0, 0.2); /* Darker input background */
-  color: #e0e0e0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
   transition: all 0.3s ease;
-  box-sizing: border-box; /* Ensure padding doesn't expand width */
 }
-.form-group input:focus { outline: none; border-color: #89ce8c; box-shadow: 0 0 8px rgba(137, 206, 140, 0.2); }
-.form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 25px; }
+
+.form-group input:focus {
+  outline: none;
+  border-color: #89ce8c;
+  box-shadow: 0 0 10px rgba(137, 206, 140, 0.3);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
 
 /* Address cards */
-.addresses-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 20px; }
-.address-card { position: relative; background: none; /* Remove duplicate background */ }
-.default-badge { position: absolute; top: 10px; right: 10px; background-color: #5a6d5a; color: white; padding: 3px 10px; border-radius: 15px; font-size: 0.75rem; }
-.default-address { border: 2px solid #89ce8c; box-shadow: 0 0 15px rgba(137, 206, 140, 0.3); }
-.address-details p { margin: 3px 0; font-size: 0.9rem; color: #c0c0c0; }
-.address-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
-.delete-btn { color: #ff8a80 !important; border-color: #ff8a80 !important; }
-.delete-btn:hover { background-color: rgba(255, 138, 128, 0.1) !important; }
+.addresses-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
 
+.address-card {
+  position: relative;
+  background: linear-gradient(135deg, rgba(58, 74, 58, 0.6) 0%, rgba(40, 52, 40, 0.8) 100%);
+}
+
+.default-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #5a6d5a;
+  color: white;
+  padding: 3px 10px;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.default-address {
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 20px rgba(137, 206, 140, 0.4);
+}
+
+.address-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.delete-btn {
+  color: #ff9e9e;
+  border-color: #ff9e9e;
+}
+
+/* Wishlist items */
+.wishlist-item {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: linear-gradient(135deg, rgba(58, 74, 58, 0.6) 0%, rgba(40, 52, 40, 0.8) 100%);
+}
+
+.wishlist-item-image {
+  width: 100px;
+  height: 100px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: transform 0.3s ease;
+}
+
+.wishlist-item:hover .wishlist-item-image {
+  transform: scale(1.05);
+}
+
+.wishlist-item-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+}
+
+.remove-btn {
+  color: #ff9e9e;
+  border-color: #ff9e9e;
+}
+
+/* Offer cards */
+.offers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.offer-card {
+  position: relative;
+  text-align: center;
+  background: linear-gradient(135deg, rgba(58, 74, 58, 0.6) 0%, rgba(40, 52, 40, 0.8) 100%);
+}
+
+.offer-badge {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background-color: #ffffff;
+  color: #3a4a3a;
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-weight: bold;
+  font-size: 0.8rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
 
 /* Activity items */
-.activity-item { display: flex; align-items: center; gap: 15px; background: none; }
-.activity-icon { width: 35px; height: 35px; border-radius: 50%; background-color: rgba(137, 206, 140, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #89ce8c; flex-shrink: 0; }
-.activity-date { color: #aaa; font-size: 0.8rem; margin-top: 2px; }
-.activity-details p { margin: 0; color: #d0d0d0; }
-.activity-details p:first-child { font-weight: 500; }
-
-
-/* General Text Color Adjustments (if needed, based on new background) */
-.ds-main-content-area h1, 
-.ds-main-content-area h2, 
-.ds-main-content-area h3 {
-  color: #a5d6a7; /* Greenish titles */
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background: linear-gradient(135deg, rgba(58, 74, 58, 0.6) 0%, rgba(40, 52, 40, 0.8) 100%);
 }
 
-/* Loading overlay */
-.loading-overlay {
-  position: fixed; /* Or absolute if contained within dashboard */
-  top: 0; left: 0; width: 100%; height: 100%;
-  background-color: rgba(0,0,0,0.7);
+.activity-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.2);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
-  color: white;
+  font-size: 1.2rem;
+  color: #ffffff;
+  flex-shrink: 0;
 }
-.loading-spinner {
-  border: 5px solid #f3f3f3;
-  border-top: 5px solid #89ce8c;
+
+.activity-date {
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  margin-top: 3px;
+}
+
+/* Empty states */
+.empty-wishlist {
+  text-align: center;
+  padding: 40px 20px;
+  background: linear-gradient(135deg, rgba(58, 74, 58, 0.6) 0%, rgba(40, 52, 40, 0.8) 100%);
+  border-radius: 15px;
+  border: 2px dashed rgba(137, 206, 140, 0.5);
+}
+
+.empty-wishlist h3 {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(137, 206, 140, 0.5);
+}
+
+.empty-wishlist p {
+  color: #e0e0e0;
+  margin-bottom: 20px;
+}
+
+/* Text Color Hierarchy */
+.forge-branding h3,
+.main-content h1,
+.main-content h2,
+.main-content h3,
+.empty-wishlist h3,
+.stat-card h3,
+.order-card h3,
+.profile-card h3,
+.address-card h3,
+.wishlist-item h3,
+.offer-card h3 {
+  color: #89ce8c;
+  position: relative;
+}
+
+/* Subtitles and Secondary Headings */
+.stat-card p,
+.order-status,
+.activity-date,
+.empty-wishlist p,
+.form-group label,
+.address-card p,
+.wishlist-item p,
+.offer-card p,
+.nav-icon {
+  color: #f7d3aa;
+}
+
+/* Descriptions and Body Text */
+.order-items,
+.profile-form,
+.address-details,
+.wishlist-details,
+.offer-details,
+.activity-icon,
+.activity-item,
+.order-item {
+  color: #ffffff;
+}
+
+/* Special Status Colors */
+.status-completed {
+  color: #89ce8c;
+}
+
+.status-shipped {
+  color: #a5c7d6;
+}
+
+.status-processing {
+  color: #f7c3aa;
+}
+
+/* Interactive Elements */
+.primary-button {
+  color: #ffffff !important;
+}
+
+.secondary-button {
+  color: #f7d3aa !important;
+}
+
+.logout-btn,
+.delete-btn,
+.remove-btn {
+  color: #ff9e9e !important;
+  transition: all 0.3s ease;
+}
+
+.logout-btn:hover,
+.delete-btn:hover,
+.remove-btn:hover {
+  text-shadow: 0 0 10px rgba(255, 158, 158, 0.6);
+}
+
+/* Animation Keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+  .dashboard-content {
+    flex-direction: column;
+    padding: 60px;
+  }
+  
+  .sidebar {
+    width: 100%;
+  }
+  
+  .stats-container {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-content {
+    padding: 30px;
+  }
+  
+  .profile-card {
+    flex-direction: column;
+  }
+  
+  .wishlist-item {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .wishlist-item-actions {
+    margin-left: 0;
+    justify-content: center;
+    margin-top: 15px;
+  }
+  
+  .stat-number {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-content {
+    padding: 20px;
+  }
+  
+  .addresses-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .offers-grid {
+    grid-template-columns: 1fr;
+  }
+}/* ... (keep existing Dashboard.css styles) ... */
+
+/* Basic Loading Spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+/* (You already have spin keyframes, ensure it's applied to .loading-spinner if you use that class) */
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  color: #f7deaa; /* Match ds-body color */
+}
+
+.loading-overlay .loading-spinner { /* If you use this class for the spinner div */
+  border: 5px solid #f7deaa; /* Light color for spinner track */
+  border-top: 5px solid #5a6d5a; /* Primary color for spinner active part */
   border-radius: 50%;
   width: 50px;
   height: 50px;
   animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+.error-message {
+  color: #ff9e9e; /* A reddish error color */
+  background-color: rgba(255, 158, 158, 0.1);
+  border: 1px solid #ff9e9e;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+
+/* Address Form Modal Styles */
+.address-form-modal {
+  width: 90%;
+  max-width: 500px; /* Max width for the modal */
+  max-height: 90vh; /* Max height */
+  overflow-y: auto; /* Scroll if content overflows */
+}
+
+.address-form-modal h2 {
+  color: #89ce8c; /* Match other heading colors */
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.address-form-modal .form-group {
   margin-bottom: 15px;
 }
 
-
-/* Animation Keyframes */
-@keyframes fadeIn { from { opacity: 0; transform: translateX(-15px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-
-/* Responsive adjustments - Keep these, but verify they target the new layout classes if needed */
-@media (max-width: 992px) {
-  .ds-dashboard-layout { /* Changed from .dashboard-content */
-    flex-direction: column;
-    padding: 20px; /* Adjusted padding */
-    gap: 20px;
-  }
-  .ds-sidebar {
-    width: 100%;
-    height: auto; /* Allow sidebar to adjust height */
-    margin-bottom: 20px;
-  }
-  .stats-container { flex-direction: column; }
+.address-form-modal .form-group label {
+  display: block;
+  margin-bottom: 5px;
+  color: #e0e0e0; /* Match other labels */
+  font-size: 0.9rem;
 }
 
-@media (max-width: 768px) {
-  .ds-dashboard-layout { padding: 15px; }
-  .profile-card { flex-direction: column; }
-  .stat-number { font-size: 2rem; }
+.address-form-modal .form-group input[type="text"],
+.address-form-modal .form-group input[type="tel"],
+.address-form-modal .form-group input[type="checkbox"] {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+  transition: all 0.3s ease;
+  box-sizing: border-box; /* Important for width calculation */
+}
+.address-form-modal .form-group input[type="checkbox"] {
+    width: auto; /* Checkboxes should not be full width */
+    margin-right: 8px;
 }
 
-@media (max-width: 480px) {
-  .ds-dashboard-layout { padding: 10px; }
-  .addresses-container { grid-template-columns: 1fr; }
-  .ds-nav-menu li { padding: 10px 12px; }
-  .ds-nav-icon { font-size: 1rem; margin-right: 8px; }
+
+.address-form-modal .form-group input:focus {
+  outline: none;
+  border-color: #89ce8c;
+  box-shadow: 0 0 10px rgba(137, 206, 140, 0.3);
+}
+
+.address-form-modal .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* Ensure buttons inside modal use dashboard theme */
+.address-form-modal .primary-button,
+.address-form-modal .secondary-button {
+  padding: 10px 20px;
+  border-radius: 25px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  /* Styles are mostly inherited, add specific overrides if needed */
+}
+.address-form-modal .primary-button {
+  background-color: #5a6d5a; /* from .primary-button */
+  color: white;
+}
+.address-form-modal .secondary-button {
+  background-color: transparent; /* from .secondary-button */
+  color: #ffffff;
+  border: 1px solid #ffffff;
+}
+.address-form-modal .secondary-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.profile-avatar {
+  text-align: center; /* Centers the button below if it's inline-block */
+  margin-bottom: 15px;
+}
+
+/* This will be the fixed-size circular container */
+.avatar-display-area {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%; /* Makes it a circle */
+  margin-left: auto;   /* Centering the circle itself */
+  margin-right: auto;
+  margin-bottom: 15px; /* Space between circle and button */
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 20px rgba(137, 206, 140, 0.3);
+  overflow: hidden; /* CRITICAL: This ensures the image inside is clipped to the circle */
+  background-color: rgba(255, 255, 255, 0.1); /* Default background, visible for placeholder */
+  position: relative; /* For potential future absolute positioning of elements inside if needed */
+  display: flex; /* To center placeholder content if not using an image */
+  align-items: center;
+  justify-content: center;
+}
+
+/* Styles for the actual <img> tag when an avatar URL is present */
+.avatar-image-tag {
+  display: block; /* Good practice for images */
+  width: 100%;    /* Make the image fill the .avatar-display-area */
+  height: 100%;   /* Make the image fill the .avatar-display-area */
+  object-fit: cover; /* This is key: scales the image to maintain aspect ratio while filling the element's entire content box. If the image's aspect ratio does not match the aspect ratio of its box, then the object will be clipped to fit. */
+}
+
+/* Styles for the content within the placeholder (e.g., an icon or initials) */
+.avatar-placeholder-content {
+  font-size: 4rem; /* Example size for an icon */
+  color: #89ce8c; /* Example color for the placeholder icon/text */
+  line-height: 1; /* Ensure icon is centered vertically if it has line height */
 }

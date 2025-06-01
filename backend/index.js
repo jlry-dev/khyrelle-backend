@@ -43,12 +43,11 @@ app.use('/api/user', ROUTERS.userRouter)
 
 
 
-// --- Default Route ---
+// --- Default Route & Start Server ---
 app.get('/', (req, res) => {
   res.send('Welcome to the Metalworks API!');
 });
 
-// --- Start the Server ---
 app.listen(PORT, () => {
   console.log(`Backend server is running on http://localhost:${PORT}`);
   console.log(`Accepting requests from: ${REACT_APP_FRONTEND_URL}`);
