@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './co.css'; // Make sure this CSS file exists and is styled
 import { useCart } from '../../data/CartProvider'; // Adjust path to your CartProvider.js
+import { useAuth } from '../../data/AuthProvider'; // Import useAuth
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ const CheckoutPage = () => {
     handleRemoveItem: removeFromCart,
     clearCart 
   } = useCart();
+  const { user, isAuthenticated } = useAuth(); // Get user and auth status
 
   const [message, setMessage] = useState('');
   const [discountCode, setDiscountCode] = useState('');
@@ -58,6 +60,12 @@ const CheckoutPage = () => {
   };
 
   const handlePlaceOrder = async () => {
+    if (!isAuthenticated || !user?.CustomerID) {
+      alert("Please log in to place an order.");
+      navigate('/login', { state: { from: '/checkout' } }); // Redirect to login
+      return;
+    }
+
     if (cartItems.length === 0) {
         alert("Your cart is empty. Please add items before placing an order.");
         return;
@@ -82,6 +90,7 @@ const CheckoutPage = () => {
       appliedDiscountAmount: discountAmount,
       merchandiseSubtotal: merchandiseSubtotal,
       shippingFee: shipping,
+      // CustomerID is now sent via header by backend's authenticateUser
     };
     
     try {
@@ -89,20 +98,28 @@ const CheckoutPage = () => {
       console.log("CheckoutPage: Attempting to place order to URL:", apiUrl); 
       console.log("CheckoutPage: Sending this payload to backend:", JSON.stringify(orderPayloadToBackend, null, 2));
 
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      // Add the temp-user-id header if user is available (placeholder for real auth token)
+      if (user && user.CustomerID) {
+        headers['temp-user-id'] = user.CustomerID;
+      } else {
+        // This case should ideally be caught by the isAuthenticated check above
+        throw new Error("User CustomerID not found for placing order.");
+      }
+      console.log("CheckoutPage: Sending headers:", headers);
+
 
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // 'Authorization': `Bearer ${yourAuthToken}` // Add if using token auth
-        },
+        headers: headers, // Use the constructed headers
         body: JSON.stringify(orderPayloadToBackend)
       });
 
       const backendResponseData = await response.json(); 
 
       if (!response.ok) {
-        // Log the raw response text if it's not JSON to see the HTML error
         if (response.headers.get("content-type") && !response.headers.get("content-type").includes("application/json")) {
             const textError = await response.text();
             console.error("Backend Error (Non-JSON Response):", textError);
@@ -130,8 +147,9 @@ const CheckoutPage = () => {
         appliedDiscountAmount: discountAmount,
         finalTotal: totalPayment, 
         customerDetails: { 
-            name: "Valued Customer", 
-            shippingAddress: "CM Recto Ave. Lapasan, CDOC PH" 
+            name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || "Valued Customer", 
+            email: user.email || user.userEmail || '',
+            shippingAddress: "CM Recto Ave. Lapasan, CDOC PH" // Placeholder
         }
       };
       
@@ -172,12 +190,12 @@ const CheckoutPage = () => {
           <div className="order-items-section">
             <h2>Your Items</h2>
             {cartItems.length === 0 ? (
-                <p>Your cart is empty. <Link to="/product">Continue Shopping</Link></p>
+                <p>Your cart is empty. <Link to="/products">Continue Shopping</Link></p>
             ) : ( 
                 cartItems.map(item => (
                   <div key={`${item.id}-${item.rushOrder}`} className="order-item">
                     <div className="item-image">
-                      <img src={item.image || '/placeholder.png'} alt={item.name} />
+                      <img src={item.image || '/placeholder.png'} alt={item.name} className="checkout-item-thumbnail"/>
                     </div>
                     <div className="item-details">
                       <div className="item-info">

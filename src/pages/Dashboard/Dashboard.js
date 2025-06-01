@@ -1,418 +1,270 @@
-import React, { useState, useCallback, createContext, useContext } from 'react';
-import './Dashboard.css';
-import bronzeArmorImg from './dashassets/bronze_armor.png';
-import steelHelmetImg from './dashassets/steel_helmet.png';
-import ironSwordImg from './dashassets/iron_sword.png';
-import titaniumHelmetImg from './dashassets/titanium_helmet.png';
-import ironShieldImg from './dashassets/iron_shield.png';
-import cloud1 from '../../assets/cloud1.png';
+// src/pages/Dashboard/Dashboard.js
+import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import './Dashboard.css'; 
+import { useAuth } from '../../data/AuthProvider'; 
+import { productImages } from '../../utils/productImages'; // For displaying item images in order history
 
-const DashboardContext = createContext();
+import cloud1 from '../../assets/cloud1.png'; // Assuming path is correct relative to src/pages/Dashboard/
 
-const useOrders = () => {
-  const [orders, setOrders] = useState([
-    {
-      id: 'BS-20240328-7429',
-      date: 'March 28, 2024',
-      total: '₱3,400',
-      status: 'Completed',
-      items: [
-        { id: 1, name: 'Bronze Armor', price: '₱1,500', image: bronzeArmorImg },
-        { id: 2, name: 'Steel Helmet', price: '₱600', image: steelHelmetImg },
-        { id: 3, name: 'Iron Sword', price: '₱1,000', image: ironSwordImg },
-        { id: 4, name: 'Titanium Helmet', price: '₱1,800', image: titaniumHelmetImg }
-      ]
-    },
-    {
-      id: 'BS-20240215-3842',
-      date: 'February 15, 2024',
-      total: '₱900',
-      status: 'Shipped',
-      items: [
-        { id: 1, name: 'Iron Shield', price: '₱900', image: ironShieldImg }
-      ]
-    },
-    {
-      id: 'BS-20240103-1267',
-      date: 'January 3, 2024',
-      total: '₱2,500',
-      status: 'Processing',
-      items: [
-        { id: 1, name: 'Bronze Armor', price: '₱1,500', image: bronzeArmorImg },
-        { id: 2, name: 'Iron Sword', price: '₱1,000', image: ironSwordImg }
-      ]
+const DashboardContext = createContext(null);
+
+// This hook will fetch and manage all data specific to the dashboard for the logged-in user
+const useDashboardData = () => {
+  const { user, isAuthenticated, isLoading: isLoadingAuth } = useAuth(); 
+  const [userOrders, setUserOrders] = useState([]);
+  const [userProfileData, setUserProfileData] = useState({
+    firstName: '', lastName: '', email: '', phone: ''
+  });
+  const [addresses, setAddresses] = useState([]); 
+  const [isLoadingData, setIsLoadingData] = useState(true); 
+  const [error, setError] = useState(null);
+
+  // Calculated dashboard stats
+  const [totalOrdersPlaced, setTotalOrdersPlaced] = useState(0); 
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
+  const [recentActivities, setRecentActivities] = useState([]);
+
+  // API_BASE_URL is no longer needed here as we'll use relative paths for proxy
+  // const API_BASE_URL = process.env.REACT_APP_API_BASE_URL; 
+
+  const getAuthHeaders = useCallback(() => {
+    const headers = { 'Content-Type': 'application/json' };
+    const token = localStorage.getItem('authToken'); 
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    } else if (user?.CustomerID && typeof user.CustomerID === 'number' && !isNaN(user.CustomerID)) { 
+        console.log(`Dashboard/getAuthHeaders: Setting 'temp-user-id' to ${user.CustomerID}`);
+        headers['temp-user-id'] = user.CustomerID;
+    } else {
+        console.warn("Dashboard/getAuthHeaders: No valid CustomerID in user object or no token. Header for user ID not set.", {user});
     }
-  ]);
+    return headers;
+  }, [user, isAuthenticated]); 
 
-  return { orders, setOrders };
+  useEffect(() => {
+    console.log("Dashboard/useDashboardData useEffect: Auth state update:", 
+      { isLoadingAuth, isAuthenticated, customerID: user?.CustomerID, userObj: user }
+    );
+
+    if (isLoadingAuth) {
+      console.log("Dashboard/useDashboardData: Auth is still loading. Waiting...");
+      setIsLoadingData(true); 
+      return; 
+    }
+
+    if (isAuthenticated && user?.CustomerID && typeof user.CustomerID === 'number' && !isNaN(user.CustomerID)) {
+      setIsLoadingData(true);
+      setError(null);
+      console.log(`Dashboard/useDashboardData: Auth confirmed. Fetching data for CustomerID: ${user.CustomerID}`);
+      
+      const fetchData = async () => {
+        const headers = getAuthHeaders();
+        
+        if (!headers['temp-user-id'] && !headers['Authorization'] ) { 
+            console.error("Dashboard/fetchData: CRITICAL - No authentication identifier (temp-user-id or Authorization token) in headers. Aborting fetch.");
+            setError("User authentication identifier is missing. Cannot fetch dashboard data.");
+            setIsLoadingData(false);
+            return;
+        }
+        console.log("Dashboard/fetchData: Attempting to fetch with headers:", JSON.stringify(headers));
+
+        try {
+          // Use relative paths for API calls, assuming proxy is set up in package.json
+          const [profileRes, ordersRes, addressesRes] = await Promise.all([
+            fetch(`/api/user/profile`, { headers }).catch(e => { console.error("Profile fetch network error:", e); return {ok: false, statusText: e.message, status: 503, json: () => Promise.resolve({message: e.message})} ;}),
+            fetch(`/api/user/orders`, { headers }).catch(e => { console.error("Orders fetch network error:", e); return {ok: false, statusText: e.message, status: 503, json: () => Promise.resolve({message: e.message})} ;}),
+            fetch(`/api/user/addresses`, { headers }).catch(e => { console.error("Addresses fetch network error:", e); return {ok: false, statusText: e.message, status: 503, json: () => Promise.resolve({message: e.message})} ;})
+          ]);
+
+          // Process Profile
+          if (!profileRes.ok) {
+            const profileErrData = await profileRes.json().catch(() => ({message: `Profile fetch failed with status: ${profileRes.status}`}));
+            throw new Error(`Failed to fetch profile: ${profileErrData.message || profileRes.statusText} (${profileRes.status})`);
+          }
+          const profileData = await profileRes.json();
+          setUserProfileData({
+            firstName: profileData.firstName || user.firstName || '',
+            lastName: profileData.lastName || user.lastName || '',
+            email: profileData.email || user.email || '', 
+            phone: profileData.phone || ''
+          });
+
+          // Process Orders
+          if (!ordersRes.ok) {
+            const ordersErrData = await ordersRes.json().catch(() => ({message: `Orders fetch failed with status: ${ordersRes.status}`}));
+            throw new Error(`Failed to fetch orders: ${ordersErrData.message || ordersRes.statusText} (${ordersRes.status})`);
+          }
+          const ordersData = await ordersRes.json();
+          const processedOrders = ordersData.map(order => ({
+            ...order, total: Number(order.total) || 0, date: order.date, 
+            items: (order.items || []).map(item => ({ 
+              ...item, image: productImages[item.imagePath] || productImages['default_placeholder.png'],
+              price: Number(item.price) || 0
+            }))
+          }));
+          setUserOrders(processedOrders);
+          setTotalOrdersPlaced(processedOrders.length);
+          const totalSpent = processedOrders.reduce((sum, order) => sum + order.total, 0);
+          setLoyaltyPoints(Math.floor(totalSpent * 0.10));
+          setRecentActivities(processedOrders.slice(0, 3).map(o => ({ type: 'order', description: `Order #${o.id} status: ${o.status}`, date: o.date, id: o.id })));
+          
+          // Process Addresses
+          if (addressesRes.ok) {
+            const addressesData = await addressesRes.json();
+            if (addressesData.message === "Addresses GET not implemented") { setAddresses([]); } 
+            else { setAddresses(addressesData); }
+          } else { console.warn(`Failed to fetch addresses. API might not be ready.`); setAddresses([]); }
+
+        } catch (err) {
+          console.error("Dashboard/fetchData: Error during API calls:", err);
+          setError(err.message || "Could not load dashboard data.");
+        } finally {
+          setIsLoadingData(false);
+        }
+      };
+      fetchData();
+    } else if (!isLoadingAuth && !isAuthenticated) {
+      console.log("Dashboard/useDashboardData: User not authenticated. Clearing data.");
+      setIsLoadingData(false); 
+      setUserOrders([]); setUserProfileData({ firstName: '', lastName: '', email: '', phone: ''});
+      setAddresses([]); setTotalOrdersPlaced(0); setLoyaltyPoints(0); setRecentActivities([]);
+    }
+  }, [isAuthenticated, user, isLoadingAuth, getAuthHeaders]); 
+  
+  return { 
+    userOrders, setUserOrders, userProfileData, setUserProfileData, addresses, setAddresses,
+    isLoadingData, error, totalOrdersPlaced, loyaltyPoints, recentActivities, getAuthHeaders 
+  };
 };
 
-const useAddresses = () => {
-  const [addresses, setAddresses] = useState([
-    {
-      id: 1,
-      nickname: 'Castle',
-      default: true,
-      line1: 'Royal Tower, Castle Keep',
-      line2: 'Kingdom of Camelot',
-      city: 'Avalon',
-      region: 'Mythical Lands',
-      postal: '12345',
-      country: 'Britannia'
-    },
-    {
-      id: 2,
-      nickname: 'Barracks',
-      default: false,
-      line1: 'Northern Battalion HQ',
-      line2: 'Military Quarter',
-      city: 'Camelot',
-      region: 'Central Kingdom',
-      postal: '67890',
-      country: 'Britannia'
-    }
-  ]);
-
-  return { addresses, setAddresses };
-};
-
-const useStatus = () => {
-  const getStatusClass = useCallback((status) => {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return 'status-completed';
-      case 'shipped':
-        return 'status-shipped';
-      case 'processing':
-        return 'status-processing';
-      default:
-        return '';
-    }
-  }, []);
-
-  return { getStatusClass };
-};
 
 const DashboardProvider = ({ children }) => {
-  const { orders, setOrders } = useOrders();
-  const { addresses, setAddresses } = useAddresses();
-  const { getStatusClass } = useStatus();
+  const dashboardDataHook = useDashboardData();
   const [activeSection, setActiveSection] = useState('dashboard');
+  const { user, logout } = useAuth(); 
+  const navigate = useNavigate(); 
+  // API_BASE_URL removed
+
+  const handleLogout = () => { logout(); navigate("/login"); };
+  const handleShopNow = () => navigate('/products');
+  const handleTrackOrder = (orderId) => navigate('/ordertrack', { state: { orderId } });
+  const handleBuyAgain = (orderId) => alert('Buy Again feature coming soon!');
+  const handleCancelOrder = (orderId) => alert('Order cancellation feature coming soon!');
+  const handleChangeAvatar = () => alert('Avatar change coming soon!');
+
+  const handleSaveProfile = async (profileToSave) => {
+    if (!user?.CustomerID) { alert("Not authenticated."); return false; }
+    try {
+      const response = await fetch(`/api/user/profile`, { // Relative path
+        method: 'PUT', headers: dashboardDataHook.getAuthHeaders(), body: JSON.stringify(profileToSave)
+      });
+      const responseData = await response.json();
+      if (!response.ok) throw new Error(responseData.message || "Failed to save profile.");
+      dashboardDataHook.setUserProfileData(prev => ({...prev, ...profileToSave, email: prev.email})); 
+      alert('Profile changes saved successfully!'); return true;
+    } catch (error) { console.error("Error saving profile:", error); alert(`Failed to save profile: ${error.message}`); return false; }
+  };
   
-  const handleLogout = () => {
-  console.log('Logging out...');
-  localStorage.removeItem('user'); 
-  localStorage.removeItem('token'); 
-  window.location.href = "/login";
-};
-
-
-  const handleShopNow = () => {
-    console.log('Navigating to shop...');
-    alert('Redirecting to shop page');
+  const handleChangePassword = async (currentPassword, newPassword) => {
+    if (!user?.CustomerID) { alert("Not authenticated."); return false; }
+    try {
+        const response = await fetch(`/api/user/password`, { // Relative path
+            method: 'POST', headers: dashboardDataHook.getAuthHeaders(), body: JSON.stringify({ currentPassword, newPassword })
+        });
+        const responseData = await response.json();
+        if (!response.ok) throw new Error(responseData.message || "Failed to change password.");
+        alert("Password changed successfully!"); return true;
+    } catch (error) { console.error("Error changing password:", error); alert(`Password change failed: ${error.message}`); return false;}
   };
 
-  const handleViewDetails = () => {
-    console.log('Showing product details...');
-    alert('Showing product details for Dragon Scale Armor');
-  };
-
-  const handleTrackOrder = (orderId) => {
-    console.log(`Tracking order ${orderId}...`);
-    alert(`Tracking order ${orderId}`);
-  };
-
-  const handleBuyAgain = (orderId) => {
-    console.log(`Buying again from order ${orderId}...`);
-    alert(`Adding items from order ${orderId} to cart`);
-  };
-
-  const handleCancelOrder = (orderId) => {
-    console.log(`Canceling order ${orderId}...`);
-    alert(`Canceling order ${orderId}`);
-  };
-
-  const handleChangeAvatar = () => {
-    console.log('Changing avatar...');
-    alert('Opening avatar upload dialog');
-  };
-
-  const handleSaveProfile = () => {
-    console.log('Saving profile changes...');
-    alert('Profile changes saved');
-  };
-
-  const handleCancelProfile = () => {
-    console.log('Canceling profile changes...');
-    alert('Profile changes discarded');
-  };
-
-  const handleAddAddress = () => {
-    console.log('Adding new address...');
-    alert('Opening new address form');
-  };
-
-  const handleEditAddress = (addressId) => {
-    console.log(`Editing address ${addressId}...`);
-    alert(`Editing address ${addressId}`);
-  };
-
-  const handleDeleteAddress = (addressId) => {
-    console.log(`Deleting address ${addressId}...`);
-    if (window.confirm('Are you sure you want to delete this address?')) {
-      alert(`Address ${addressId} deleted`);
-    }
-  };
-
-  const handleSetDefaultAddress = (addressId) => {
-    console.log(`Setting address ${addressId} as default...`);
-    alert(`Address ${addressId} set as default`);
-  };
-
+  const handleAddAddress = async (newAddress) => alert('Add address API not implemented.'); 
+  const handleEditAddress = async (addressId, updatedAddress) => alert('Edit address API not implemented.'); 
+  const handleDeleteAddress = async (addressId) => { if(window.confirm('Sure?')) alert('Delete address API not implemented.'); };
+  const handleSetDefaultAddress = async (addressId) => alert('Set default address API not implemented.');
+  
   const value = {
-    orders,
-    setOrders,
-    addresses,
-    setAddresses,
-    activeSection,
-    setActiveSection,
-    getStatusClass,
-    handleLogout,
-    handleShopNow,
-    handleViewDetails,
-    handleTrackOrder,
-    handleBuyAgain,
-    handleCancelOrder,
-    handleChangeAvatar,
-    handleSaveProfile,
-    handleCancelProfile,
-    handleAddAddress,
-    handleEditAddress,
-    handleDeleteAddress,
-    handleSetDefaultAddress
+    ...dashboardDataHook, activeSection, setActiveSection,
+    getStatusClass: useCallback((status) => { 
+        switch (status?.toLowerCase()) {
+            case 'completed': return 'status-completed'; case 'shipped': return 'status-shipped';
+            case 'processing': return 'status-processing'; case 'pending': return 'status-pending';
+            case 'cancelled': return 'status-cancelled'; default: return '';
+        }
+    }, []),
+    handleLogout, handleShopNow, handleTrackOrder, handleBuyAgain, handleCancelOrder,
+    handleChangeAvatar, handleSaveProfile, handleChangePassword,
+    handleAddAddress, handleEditAddress, handleDeleteAddress, handleSetDefaultAddress
   };
-
-  return (
-    <DashboardContext.Provider value={value}>
-      {children}
-    </DashboardContext.Provider>
-  );
+  return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;
 };
 
-const useDashboard = () => {
+const useDashboard = () => { 
   const context = useContext(DashboardContext);
-  if (!context) {
-    throw new Error('useDashboard must be used within a DashboardProvider');
-  }
+  if (!context) throw new Error('useDashboard must be used within a DashboardProvider');
   return context;
 };
 
-const DashboardContent = () => {
-  const {
-    activeSection,
-    setActiveSection,
-    isLoading,
-    handleLogout
-  } = useDashboard();
-
-  if (isLoading) {
-    return (
-      <div className="loading-overlay">
-        <div className="loading-spinner"></div>
-        <p>Loading your dashboard...</p>
-      </div>
-    );
+const DashboardOverview = ({/* ...props as before... */}) => { /* ... Full JSX from previous version ... */ 
+  const { userProfileData, totalOrdersPlaced, loyaltyPoints, recentActivities, handleShopNow, setActiveSection, isLoadingData, error } = useDashboard();
+  if (isLoadingData && totalOrdersPlaced === undefined ) return <div className="loading-message">Loading dashboard overview...</div>; 
+  if (error && totalOrdersPlaced === undefined ) {
+      return <p style={{color: 'red'}}>Could not load dashboard overview data: {error}</p>;
   }
-
-  return (
-    <div className="ds-dashboard-content">
-      <div className="ds-sidebar">
-        <div className="ds-nav-container">
-          <ul className="ds-nav-menu">
-            <li 
-              className={activeSection === 'dashboard' ? 'active' : ''}
-              onClick={() => setActiveSection('dashboard')}
-              aria-current={activeSection === 'dashboard' ? 'page' : undefined}
-            >
-              <span className="nav-icon" aria-hidden="true">⚔️</span> Dashboard
-            </li>
-            <li 
-              className={activeSection === 'order-history' ? 'active' : ''}
-              onClick={() => setActiveSection('order-history')}
-              aria-current={activeSection === 'order-history' ? 'page' : undefined}
-            >
-              <span className="nav-icon" aria-hidden="true">📜</span> Order History
-            </li>
-            <li 
-              className={activeSection === 'profile-details' ? 'active' : ''}
-              onClick={() => setActiveSection('profile-details')}
-              aria-current={activeSection === 'profile-details' ? 'page' : undefined}
-            >
-              <span className="nav-icon" aria-hidden="true">👤</span> Profile Details
-            </li>
-            <li 
-              className={activeSection === 'addresses' ? 'active' : ''}
-              onClick={() => setActiveSection('addresses')}
-              aria-current={activeSection === 'addresses' ? 'page' : undefined}
-            >
-              <span className="ds-nav-icon" aria-hidden="true">🏰</span> Addresses
-            </li>
-            <li className="logout-btn" onClick={handleLogout}>
-              <span className="ds-nav-icon" aria-hidden="true">🚪</span> Logout
-            </li>
-          </ul>
-        </div>
-        <div className="ds-main-panel">
-          <img src={cloud1} alt="Decorative cloud background" className="zoomed-full-image" />
-        </div>
-
-        <div className="forge-branding">
-          <h3>MetalWorks</h3>
-          <p>Your trusted forge for tools and upgrades, crafted with skill, built for adventurers.</p>
-        </div>
-      </div>
-
-      <div className="ds-main-content">
-        {activeSection === 'dashboard' && (
-          <DashboardOverview />
-        )}
-
-        {activeSection === 'order-history' && (
-          <OrderHistorySection />
-        )}
-
-        {activeSection === 'profile-details' && (
-          <ProfileSection />
-        )}
-
-        {activeSection === 'addresses' && (
-          <AddressesSection />
-        )}
-      </div>
-    </div>
-  );
-};
-
-const DashboardOverview = () => {
-  const { handleShopNow, handleViewDetails } = useDashboard();
-
   return (
     <div className="dashboard-overview">
-      <h2>Your Dashboard</h2>
+      <h2>Welcome Back, {userProfileData.firstName || 'Adventurer'}!</h2>
       <div className="stats-container">
-        <div className="stat-card" tabIndex="0" aria-label="Orders placed: 6" onClick={() => console.log('Stat card clicked')}>
-          <h3>Orders Placed</h3>
-          <p className="stat-number">6</p>
+        <div className="stat-card" onClick={() => setActiveSection('order-history')} style={{cursor: 'pointer'}} aria-label={`Orders placed: ${totalOrdersPlaced}`}>
+          <h3>Orders Placed</h3> <p className="stat-number">{totalOrdersPlaced}</p>
         </div>
-        <div className="stat-card" tabIndex="0" aria-label="Loyalty points: 450">
-          <h3>Loyalty Points</h3>
-          <p className="stat-number">450</p>
+        <div className="stat-card" aria-label={`Loyalty points: ${loyaltyPoints}`}>
+          <h3>Loyalty Points</h3> <p className="stat-number">{loyaltyPoints}</p>
         </div>
       </div>
-
       <div className="recent-activity">
         <h3>Recent Activity</h3>
-        <div className="activity-list">
-          <div className="activity-item">
-            <div className="activity-icon order-icon" aria-hidden="true"></div>
-            <div className="activity-details">
-              <p>Order #BS-20240328-7429 has been completed</p>
-              <p className="activity-date">March 28, 2024</p>
-            </div>
-          </div>
-          <div className="activity-item">
-            <div className="activity-icon profile-icon" aria-hidden="true"></div>
-            <div className="activity-details">
-              <p>Profile information updated</p>
-              <p className="activity-date">March 15, 2024</p>
-            </div>
-          </div>
-        </div>
+        {recentActivities && recentActivities.length > 0 ? ( 
+            <div className="activity-list">
+            {recentActivities.map((activity, index) => (
+                <div key={activity.id || index} className="activity-item">
+                <div className={`activity-icon ${activity.type}-icon`} aria-hidden="true">{activity.type === 'order' ? '📜' : '👤'}</div>
+                <div className="activity-details"> <p>{activity.description}</p> <p className="activity-date">{new Date(activity.date).toLocaleDateString()}</p> </div>
+                </div>
+            ))}</div>
+        ) : ( <p>No recent orders to display.</p> )}
       </div>
-
-      <div className="special-offers">
-        <h3>Exclusive Offers</h3>
-        <div className="offers-grid">
-          <div className="offer-card" tabIndex="0">
-            <div className="offer-badge">15% OFF</div>
-            <h4>Seasonal Sale</h4>
-            <p>Premium steel products for knights and warriors</p>
-            <button className="primary-button" onClick={handleShopNow}>Shop Now</button>
-          </div>
-          <div className="offer-card" tabIndex="0">
-            <div className="offer-badge">NEW</div>
-            <h4>Dragon Scale Armor</h4>
-            <p>Limited edition, fire-resistant protection</p>
-            <button className="primary-button" onClick={handleViewDetails}>View Details</button>
-          </div>
-        </div>
-      </div>
+      <button className="primary-button" onClick={handleShopNow} style={{marginTop: '20px'}}> Continue Your Quest (Shop Now) </button>
     </div>
   );
 };
-
-const OrderHistorySection = () => {
-  const { 
-    orders, 
-    getStatusClass, 
-    handleTrackOrder, 
-    handleBuyAgain, 
-    handleCancelOrder 
-  } = useDashboard();
-
+const OrderHistorySection = ({/* ... props ... */}) => { /* ... Full JSX from previous version ... */ 
+  const { userOrders, getStatusClass, handleTrackOrder, handleBuyAgain, handleCancelOrder, isLoadingData, error } = useDashboard();
+  if (isLoadingData) return <p className="loading-message">Loading order history...</p>;
+  if (error) return <p className="error-message" style={{color: 'red'}}>Error loading order history: {error}</p>;
+  if (!userOrders || userOrders.length === 0) return <p>You have no past orders to display.</p>;
   return (
     <div className="order-history-section">
       <h2>Your Crafted Orders</h2>
       <div className="orders-container">
-        {orders.map((order) => (
-          <div key={order.id} className="order-card" tabIndex="0">
+        {userOrders.map((order) => (
+          <div key={order.id} className="order-card">
             <div className="order-header">
-              <div>
-                <h3>Order #{order.id}</h3>
-                <p>Ordered on: {order.date}</p>
-                <p>Total: {order.total}</p>
-              </div>
-              <div className={`order-status ${getStatusClass(order.status)}`}>
-                {order.status}
-              </div>
+              <div><h3>Order #{order.id}</h3><p>Ordered on: {new Date(order.date).toLocaleDateString()}</p><p>Total: ₱{(Number(order.total) || 0).toFixed(2)}</p></div>
+              <div className={`order-status ${getStatusClass(order.status)}`}>{order.status}</div>
             </div>
-            <div className="order-items">
-              {order.items.map((item) => (
-                <div key={item.id} className="order-item">
-                  <div 
-                    className="item-image" 
-                    style={{ backgroundImage: `url(${item.image})` }}
-                    aria-label={`Image of ${item.name}`}
-                  ></div>
-                  <div className="item-details">
-                    <p className="item-name">{item.name}</p>
-                    <p className="item-price">{item.price}</p>
-                  </div>
+            <div className="order-items"><h4>Items:</h4>
+              {order.items && order.items.length > 0 ? order.items.map((item, index) => (
+                <div key={item.id || index} className="order-item-summary">
+                  <img src={item.image || productImages['default_placeholder.png']} alt={item.name} className="order-item-image-sm" />
+                  <span>{item.name} (Qty: {item.quantity || 1}) - ₱{(Number(item.price) || 0).toFixed(2)}</span>
                 </div>
-              ))}
+              )) : <p>No item details available.</p>}
             </div>
             <div className="order-actions">
-              <button 
-                className="secondary-button" 
-                onClick={() => handleTrackOrder(order.id)}
-              >
-                Track your Order
-              </button>
-              {order.status === 'Completed' || order.status === 'Shipped' ? (
-                <button 
-                  className="primary-button" 
-                  onClick={() => handleBuyAgain(order.id)}
-                >
-                  Buy Again
-                </button>
-              ) : (
-                <button 
-                  className="secondary-button" 
-                  onClick={() => handleCancelOrder(order.id)}
-                >
-                  Cancel Order
-                </button>
-              )}
+              <button className="secondary-button" onClick={() => handleTrackOrder(order.id)}>Track Order</button>
+              {(order.status === 'Completed' || order.status === 'Shipped') && (<button className="primary-button" onClick={() => handleBuyAgain(order.id)}>Buy Again</button>)}
+              {(order.status === 'Processing' || order.status === 'Pending') && (<button className="secondary-button" onClick={() => handleCancelOrder(order.id)}>Cancel Order</button>)}
             </div>
           </div>
         ))}
@@ -420,141 +272,165 @@ const OrderHistorySection = () => {
     </div>
   );
 };
+const ProfileSection = ({/* ... props ... */}) => { /* ... Full JSX from previous version ... */ 
+  const { userProfileData, handleSaveProfile, handleChangePassword } = useDashboard();
+  const [isEditing, setIsEditing] = useState(false);
+  const [profileForm, setProfileForm] = useState({ firstName: '', lastName: '', phone: '' });
+  const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [profileSuccess, setProfileSuccess] = useState('');
 
-const ProfileSection = () => {
-  const { 
-    handleChangeAvatar, 
-    handleSaveProfile, 
-    handleCancelProfile 
-  } = useDashboard();
+  useEffect(() => { 
+    if (userProfileData) {
+        setProfileForm({
+            firstName: userProfileData.firstName || '',
+            lastName: userProfileData.lastName || '',
+            phone: userProfileData.phone || ''
+        });
+    }
+  }, [userProfileData]);
+
+  const handleProfileInputChange = (e) => {
+    const { name, value } = e.target;
+    setProfileForm(prev => ({ ...prev, [name]: value }));
+    setProfileError(''); setProfileSuccess('');
+  };
+  
+  const handleLocalSave = async () => {
+    setProfileError(''); setProfileSuccess('');
+    if (!profileForm.firstName || !profileForm.lastName) { setProfileError("First and last name are required."); return; }
+    const success = await handleSaveProfile(profileForm); 
+    if (success) { setIsEditing(false); setProfileSuccess("Profile updated!");}
+    else { setProfileError("Failed to update profile. Please try again or check console."); }
+  };
+
+  const handlePasswordFormChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordData(prev => ({ ...prev, [name]: value }));
+    setPasswordError(''); setPasswordSuccess('');
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setPasswordError(''); setPasswordSuccess('');
+    if (passwordData.newPassword !== passwordData.confirmPassword) { setPasswordError("New passwords do not match."); return; }
+    if (passwordData.newPassword.length < 8) { setPasswordError("New password must be at least 8 characters."); return; }
+    const success = await handleChangePassword(passwordData.currentPassword, passwordData.newPassword); 
+    if (success) {
+        setPasswordSuccess("Password changed successfully!");
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } else {
+        setPasswordError("Password change failed. Please check your current password.");
+    }
+  };
 
   return (
     <div className="profile-section">
       <h2>Blacksmith's Profile</h2>
+      {profileError && <p style={{color: 'red'}}>{profileError}</p>}
+      {profileSuccess && <p style={{color: 'green'}}>{profileSuccess}</p>}
       <div className="profile-card">
-        <div className="profile-avatar">
-          <div className="avatar-placeholder" aria-hidden="true"></div>
-          <button 
-            className="secondary-button" 
-            onClick={handleChangeAvatar}
-          >
-            Change Avatar
-          </button>
-        </div>
         <div className="profile-form">
-          <div className="form-group">
-            <label htmlFor="fullName">Full Name</label>
-            <input id="fullName" type="text" defaultValue="Arthur Pendragon" />
-          </div>
-          <div className="form-group">
-            <label htmlFor="email">Email Address</label>
-            <input id="email" type="email" defaultValue="kingarthur@camelot.realm" />
-          </div>
-          <div className="form-group">
-            <label htmlFor="phone">Phone Number</label>
-            <input id="phone" type="tel" defaultValue="123-456-7890" />
-          </div>
-          <h3>Change Password</h3>
-          <div className="form-group">
-            <label htmlFor="currentPassword">Current Password</label>
-            <input id="currentPassword" type="password" placeholder="Enter current password" />
-          </div>
-          <div className="form-group">
-            <label htmlFor="newPassword">New Password</label>
-            <input id="newPassword" type="password" placeholder="Enter new password" />
-          </div>
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
-            <input id="confirmPassword" type="password" placeholder="Confirm new password" />
-          </div>
-          <div className="form-actions">
-            <button 
-              className="secondary-button" 
-              onClick={handleCancelProfile}
-            >
-              Cancel
-            </button>
-            <button 
-              className="primary-button" 
-              onClick={handleSaveProfile}
-            >
-              Save Changes
-            </button>
-          </div>
+          <div className="form-group"><label htmlFor="firstNameD">First Name</label><input id="firstNameD" name="firstName" type="text" value={profileForm.firstName} onChange={handleProfileInputChange} readOnly={!isEditing} /></div>
+          <div className="form-group"><label htmlFor="lastNameD">Last Name</label><input id="lastNameD" name="lastName" type="text" value={profileForm.lastName} onChange={handleProfileInputChange} readOnly={!isEditing} /></div>
+          <div className="form-group"><label htmlFor="emailD">Email Address</label><input id="emailD" name="email" type="email" value={userProfileData.email} readOnly /></div>
+          <div className="form-group"><label htmlFor="phoneD">Phone Number</label><input id="phoneD" name="phone" type="tel" value={profileForm.phone} onChange={handleProfileInputChange} readOnly={!isEditing} /></div>
+          {isEditing ? (
+            <div className="form-actions">
+              <button className="secondary-button" onClick={() => { setIsEditing(false); setProfileForm(userProfileData || { firstName: '', lastName: '', phone: '' }); setProfileError(''); setProfileSuccess(''); }}>Cancel</button>
+              <button className="primary-button" onClick={handleLocalSave}>Save Changes</button>
+            </div>
+          ) : ( <button className="primary-button" onClick={() => setIsEditing(true)}>Edit Profile</button> )}
+          <h3 style={{marginTop: '30px'}}>Change Password</h3>
+          <form onSubmit={handlePasswordSubmit}>
+            <div className="form-group"><label htmlFor="currentPasswordD">Current Password</label><input id="currentPasswordD" name="currentPassword" type="password" placeholder="Enter current password" value={passwordData.currentPassword} onChange={handlePasswordFormChange} /></div>
+            <div className="form-group"><label htmlFor="newPasswordD">New Password</label><input id="newPasswordD" name="newPassword" type="password" placeholder="Enter new password" value={passwordData.newPassword} onChange={handlePasswordFormChange} /></div>
+            <div className="form-group"><label htmlFor="confirmPasswordD">Confirm New Password</label><input id="confirmPasswordD" name="confirmPassword" type="password" placeholder="Confirm new password" value={passwordData.confirmPassword} onChange={handlePasswordFormChange} /></div>
+            {passwordError && <p style={{color: 'red'}}>{passwordError}</p>}
+            {passwordSuccess && <p style={{color: 'green'}}>{passwordSuccess}</p>}
+            <button type="submit" className="primary-button">Update Password</button>
+          </form>
         </div>
       </div>
     </div>
   );
 };
-
-const AddressesSection = () => {
-  const { 
-    addresses, 
-    handleAddAddress, 
-    handleEditAddress, 
-    handleDeleteAddress, 
-    handleSetDefaultAddress 
-  } = useDashboard();
+const AddressesSection = ({/* ... props ... */}) => { /* ... Full JSX from previous version ... */ 
+  const { addresses, isLoadingData, error } = useDashboard(); 
+  if (isLoadingData) return <p>Loading addresses...</p>;
+  if (error && (!addresses || addresses.length === 0)) return <p style={{color: 'red'}}>Error loading addresses: {error}</p>;
 
   return (
     <div className="addresses-section">
       <h2>Delivery Strongholds</h2>
-      <button 
-        className="primary-button add-address" 
-        onClick={handleAddAddress}
-      >
-        Add New Address
-      </button>
+      <button className="primary-button add-address" onClick={() => alert("Add address form/modal coming soon!")}> Forge New Delivery Point </button>
       <div className="addresses-container">
-        {addresses.map((address) => (
-          <div 
-            key={address.id} 
-            className={`address-card ${address.default ? 'default-address' : ''}`}
-            tabIndex="0"
-          >
-            {address.default && <div className="default-badge">Default</div>}
-            <h3>{address.nickname}</h3>
+        {addresses && addresses.length > 0 ? addresses.map((address) => (
+          <div key={address.AddressID || address.id} className={`address-card ${address.IsDefault ? 'default-address' : ''}`}>
+            {address.IsDefault && <div className="default-badge">Default</div>}
+            <h3>{address.Nickname || `Address ${address.AddressID}`}</h3>
             <div className="address-details">
-              <p>{address.line1}</p>
-              <p>{address.line2}</p>
-              <p>{address.city}, {address.region} {address.postal}</p>
-              <p>{address.country}</p>
+              <p>{address.Line1}</p> {address.Line2 && <p>{address.Line2}</p>}
+              <p>{address.City}, {address.Region} {address.PostalCode}</p> <p>{address.Country}</p>
             </div>
             <div className="address-actions">
-              <button 
-                className="secondary-button" 
-                onClick={() => handleEditAddress(address.id)}
-              >
-                Edit
-              </button>
-              <button 
-                className="secondary-button delete-btn" 
-                onClick={() => handleDeleteAddress(address.id)}
-              >
-                Delete
-              </button>
-              {!address.default && (
-                <button 
-                  className="secondary-button" 
-                  onClick={() => handleSetDefaultAddress(address.id)}
-                >
-                  Set as Default
-                </button>
-              )}
+              <button className="secondary-button" onClick={() => alert(`Edit for AddressID ${address.AddressID} coming soon!`)}>Edit</button>
             </div>
           </div>
-        ))}
+        )) : <p>No delivery addresses on record.</p>}
       </div>
     </div>
   );
 };
-
-const Dashboard = () => {
+const DashboardContent = ({/* ... props ... */}) => { /* ... Full JSX from previous version ... */ 
+  const { activeSection, setActiveSection, handleLogout, isLoadingData, totalOrdersPlaced } = useDashboard(); 
   return (
-    <DashboardProvider>
-      <DashboardContent />
+    <div className="ds-dashboard-layout"> 
+      <div className="ds-sidebar">
+        <div className="ds-nav-container">
+          <ul className="ds-nav-menu">
+            <li className={activeSection === 'dashboard' ? 'active' : ''} onClick={() => setActiveSection('dashboard')}><span className="nav-icon" aria-hidden="true">⚔️</span> Dashboard</li>
+            <li className={activeSection === 'order-history' ? 'active' : ''} onClick={() => setActiveSection('order-history')}><span className="nav-icon" aria-hidden="true">📜</span> Order History</li>
+            <li className={activeSection === 'profile-details' ? 'active' : ''} onClick={() => setActiveSection('profile-details')}><span className="nav-icon" aria-hidden="true">👤</span> Profile Details</li>
+            <li className={activeSection === 'addresses' ? 'active' : ''} onClick={() => setActiveSection('addresses')}><span className="ds-nav-icon" aria-hidden="true">🏰</span> Addresses</li>
+            <li className="logout-btn-sidebar" onClick={handleLogout}> <span className="ds-nav-icon" aria-hidden="true">🚪</span> Logout</li>
+          </ul>
+        </div>
+        <div className="ds-sidebar-footer"> 
+            <img src={cloud1} alt="Decorative cloud background" className="sidebar-cloud-bg" />
+            <div className="forge-branding"><h3>MetalWorks</h3><p>Your trusted forge.</p></div>
+        </div>
+      </div>
+      <div className="ds-main-content-area"> 
+        {activeSection === 'dashboard' && (isLoadingData && totalOrdersPlaced === undefined ? <p>Loading Dashboard...</p> : <DashboardOverview />)}
+        {activeSection === 'order-history' && <OrderHistorySection />}
+        {activeSection === 'profile-details' && <ProfileSection />}
+        {activeSection === 'addresses' && <AddressesSection />}
+      </div>
+    </div>
+  );
+};
+const DashboardPage = ({/* ... props ... */}) => { /* ... Full JSX from previous version ... */ 
+  const { isAuthenticated, isLoadingAuth } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!isLoadingAuth && !isAuthenticated) {
+      navigate('/login', { state: { message: "Please login to view your dashboard." }});
+    }
+  }, [isAuthenticated, isLoadingAuth, navigate]);
+
+  if (isLoadingAuth || !isAuthenticated) { 
+    return <div className="ds-dashboard-container"><div className="loading-overlay"><p>Verifying adventurer status...</p></div></div>;
+  }
+  return (
+    <DashboardProvider> 
+      <div className="ds-dashboard-container">
+        <DashboardContent />
+      </div>
     </DashboardProvider>
   );
 };
 
-export default Dashboard;
+export default DashboardPage;
