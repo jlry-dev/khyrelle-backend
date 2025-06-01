@@ -66,7 +66,7 @@ const DashboardProvider = ({ children }) => {
     if (isAuthenticated && customerId) {
       setIsLoading(prev => ({ ...prev, orders: true }));
       setError(prev => ({ ...prev, orders: null }));
-      fetchApi('/api/user/orders', {}, customerId)
+      fetchApi('/api/orders', {}, customerId)
         .then(data => {
           const updatedOrders = data.map(order => ({
             ...order,
@@ -238,7 +238,7 @@ const DashboardProvider = ({ children }) => {
     setIsLoading(prev => ({ ...prev, profile: true }));
     setError(prev => ({ ...prev, profile: null })); // Clear previous error
     try {
-        await fetchApi('/api/user/password', { method: 'POST', body: JSON.stringify(passwordData) }, customerId);
+        await fetchApi('/api/user/password', { method: 'PUT', body: JSON.stringify(passwordData) }, customerId);
         alert("Password changed successfully!");
     } catch (err) {
         setError(prev => ({...prev, profile: err.message}));
