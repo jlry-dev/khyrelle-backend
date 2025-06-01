@@ -55,7 +55,7 @@ const Header = () => {
 
   const products = () => { // This will be navigateToProducts
     setShowProfileDropdown(false);
-    navigate('/products'); // Using '/products' consistently
+    navigate('/product'); // Using '/products' consistently
   };
 
   const FAQ = () => { // This will be navigateToFAQ
