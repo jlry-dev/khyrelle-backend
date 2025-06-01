@@ -95,7 +95,7 @@ const DashboardProvider = ({ children }) => {
   const fetchAddresses = useCallback(() => {
     if (isAuthenticated && customerId) {
       setIsLoading(prev => ({ ...prev, addresses: true }));
-      setError(prev => ({ ...prev, addresses: null }));
+      setError(prev => ({ ...prev, addresses: null })); // Clear previous address errors on new fetch
       fetchApi('/api/user/addresses', {}, customerId)
         .then(data => setAddresses(data || []))
         .catch(err => setError(prev => ({ ...prev, addresses: err.message })))
@@ -113,13 +113,18 @@ const DashboardProvider = ({ children }) => {
       case 'completed': return 'status-completed';
       case 'shipped': return 'status-shipped';
       case 'processing': return 'status-processing';
-      case 'pending': return 'status-processing';
+      case 'pending': return 'status-processing'; // Also treat pending as processing for style
       default: return '';
     }
   }, []);
 
   const handleLogout = () => {
     authHandleLogout();
+    // Potentially clear dashboard state if needed, though AuthProvider might handle redirects
+    // setActiveSection('dashboard');
+    // setProfile({ firstName: '', lastName: '', email: '', phone: '', avatarUrl: '' });
+    // setOrders([]);
+    // setAddresses([]);
   };
 
   const handleAddAddressClick = () => {
@@ -135,6 +140,7 @@ const DashboardProvider = ({ children }) => {
   const handleSaveAddress = async (addressData) => {
     if (!customerId) { alert("User not authenticated."); return; }
     setIsLoading(prev => ({ ...prev, addresses: true }));
+    setError(prev => ({ ...prev, addresses: null })); // Clear previous error
     try {
       if (editingAddress && editingAddress.AddressID) {
         await fetchApi(`/api/user/addresses/${editingAddress.AddressID}`, { method: 'PUT', body: JSON.stringify(addressData), }, customerId);
@@ -143,7 +149,7 @@ const DashboardProvider = ({ children }) => {
         await fetchApi('/api/user/addresses', { method: 'POST', body: JSON.stringify(addressData), }, customerId);
         alert('Address added successfully!');
       }
-      setShowAddressModal(false); setEditingAddress(null); fetchAddresses();
+      setShowAddressModal(false); setEditingAddress(null); fetchAddresses(); // Refresh addresses
     } catch (err) {
       setError(prev => ({ ...prev, addresses: err.message })); alert(`Error saving address: ${err.message}`);
     } finally { setIsLoading(prev => ({ ...prev, addresses: false })); }
@@ -153,9 +159,10 @@ const DashboardProvider = ({ children }) => {
     if (!customerId) { alert("User not authenticated."); return; }
     if (window.confirm('Are you sure you want to delete this address?')) {
       setIsLoading(prev => ({ ...prev, addresses: true }));
+      setError(prev => ({ ...prev, addresses: null })); // Clear previous error
       try {
         await fetchApi(`/api/user/addresses/${addressId}`, { method: 'DELETE' }, customerId);
-        alert('Address deleted successfully!'); fetchAddresses();
+        alert('Address deleted successfully!'); fetchAddresses(); // Refresh addresses
       } catch (err) {
         setError(prev => ({ ...prev, addresses: err.message })); alert(`Error deleting address: ${err.message}`);
       } finally { setIsLoading(prev => ({ ...prev, addresses: false })); }
@@ -165,9 +172,10 @@ const DashboardProvider = ({ children }) => {
   const handleSetDefaultAddress = async (addressId) => {
     if (!customerId) { alert("User not authenticated."); return; }
     setIsLoading(prev => ({ ...prev, addresses: true }));
+    setError(prev => ({ ...prev, addresses: null })); // Clear previous error
     try {
       await fetchApi(`/api/user/addresses/${addressId}/default`, { method: 'PUT' }, customerId);
-      alert('Address set as default!'); fetchAddresses();
+      alert('Address set as default!'); fetchAddresses(); // Refresh addresses
     } catch (err) {
       setError(prev => ({ ...prev, addresses: err.message })); alert(`Error setting default address: ${err.message}`);
     } finally { setIsLoading(prev => ({ ...prev, addresses: false })); }
@@ -190,6 +198,7 @@ const DashboardProvider = ({ children }) => {
             return; 
         }
       setIsLoading(prev => ({ ...prev, profile: true }));
+      setError(prev => ({ ...prev, profile: null })); // Clear previous error
       try {
         const response = await fetchApi('/api/user/avatar', {
           method: 'PUT',
@@ -209,6 +218,7 @@ const DashboardProvider = ({ children }) => {
   const handleSaveProfile = async (profileData) => {
     if (!customerId) { alert("User not authenticated."); return; }
     setIsLoading(prev => ({ ...prev, profile: true }));
+    setError(prev => ({ ...prev, profile: null })); // Clear previous error
     try {
         const { firstName, lastName, phone } = profileData;
         const apiResponse = await fetchApi('/api/user/profile', {
@@ -226,6 +236,7 @@ const DashboardProvider = ({ children }) => {
   const handleChangePassword = async (passwordData) => {
     if (!customerId) { alert("User not authenticated."); return; }
     setIsLoading(prev => ({ ...prev, profile: true }));
+    setError(prev => ({ ...prev, profile: null })); // Clear previous error
     try {
         await fetchApi('/api/user/password', { method: 'POST', body: JSON.stringify(passwordData) }, customerId);
         alert("Password changed successfully!");
@@ -274,14 +285,14 @@ const DashboardContent = () => {
   } = useDashboard();
 
   const isAnySectionLoading = isLoading.profile ||
-                             (isLoading.orders && (activeSection === 'order-history' || activeSection === 'dashboard')) ||
-                             (isLoading.addresses && activeSection === 'addresses');
+                                (isLoading.orders && (activeSection === 'order-history' || activeSection === 'dashboard')) ||
+                                (isLoading.addresses && activeSection === 'addresses');
 
   if (isAnySectionLoading &&
-        ( (activeSection === 'dashboard' && !profile.firstName && (!orders || !orders.length)) ||
-          (activeSection === 'order-history' && (!orders || !orders.length)) ||
-          (activeSection === 'profile-details' && !profile.firstName) ||
-          (activeSection === 'addresses' && (!addresses || !addresses.length)) )
+      ( (activeSection === 'dashboard' && !profile.firstName && (!orders || !orders.length)) ||
+        (activeSection === 'order-history' && (!orders || !orders.length)) ||
+        (activeSection === 'profile-details' && !profile.firstName) ||
+        (activeSection === 'addresses' && (!addresses || !addresses.length)) )
      ) {
     return ( 
         <div className="loading-overlay" style={{ color: '#fff', textAlign: 'center', paddingTop: '100px', fontSize: '1.5rem' }}>
@@ -329,6 +340,7 @@ const OrderHistorySection = () => {
     if (isLoading.orders && !orders.length) return <p>Loading order history...</p>; if (error.orders && !orders.length) return <p>Error: {error.orders}</p>; if (!isLoading.orders && (!orders || orders.length === 0)) return <p>You have no past orders.</p>;
     return ( <div className="order-history-section"><h2>Your Crafted Orders</h2><div className="orders-container">{orders.map((order) => (<div key={order.id || order.OrderID} className="order-card" tabIndex="0"><div className="order-header"><div><h3>Order #{(order.id || order.OrderID).toString().padStart(4, '0')}</h3><p>Ordered on: {new Date(order.date || order.OrderDate).toLocaleDateString()}</p><p>Total: ₱{(Number(order.total || order.TotalCost) || 0).toFixed(2)}</p></div><div className={`order-status ${getStatusClass(order.status)}`}>{order.status}</div></div><div className="order-items">{(order.items || []).map((item, index) => (<div key={item.ProductID || index} className="order-item"><div className="item-image" style={{ backgroundImage: `url(${item.image})`}} aria-label={`Image of ${item.name || item.ProductName}`}></div><div className="item-details"><p className="item-name">{item.name || item.ProductName}</p><p className="item-price">₱{(Number(item.price || item.UnitPrice) || 0).toFixed(2)}</p>{item.quantity && <p>Quantity: {item.quantity}</p>}</div></div>))}</div><div className="order-actions"><button className="secondary-button" onClick={() => handleTrackOrder(order.id || order.OrderID)}>Track Order</button>{order.status === 'Completed' || order.status === 'Shipped' ? (<button className="primary-button" onClick={() => handleBuyAgain(order.id || order.OrderID)}>Buy Again</button>) : (<button className="secondary-button" onClick={() => handleCancelOrder(order.id || order.OrderID)}>Cancel Order</button>)}</div></div>))}</div></div> );
 };
+
 const ProfileSection = () => {
   const { profile, handleSaveProfile, handleChangePassword, handleChangeAvatar, isLoading, error } = useDashboard();
   const [formData, setFormData] = useState({ firstName: '', lastName: '', phone: '' });
@@ -367,24 +379,24 @@ const ProfileSection = () => {
     <div className="profile-section">
       <h2>Blacksmith's Profile</h2>
       <div className="profile-card">
-        <div className="profile-avatar"> {/* This div now mainly groups the display area and the button */}
-          <div className="avatar-display-area"> {/* This is the styled circular container */}
+        <div className="profile-avatar"> 
+          <div className="avatar-display-area"> 
             {profile.avatarUrl ? (
               <img 
                 src={profile.avatarUrl} 
                 alt={`${profile.firstName || 'User'}'s Avatar`} 
-                className="avatar-image-tag" // Image fills the circular container
+                className="avatar-image-tag" 
               />
             ) : (
               <div className="avatar-placeholder-content" aria-hidden="true">
-                👤 {/* Default placeholder icon, or you can use initials, etc. */}
+                👤 
               </div>
             )}
           </div>
           <button 
             className="secondary-button" 
             onClick={handleChangeAvatar} 
-            style={{marginTop: '10px'}} // Keep or adjust as needed
+            style={{marginTop: '10px'}} 
             disabled={isLoading.profile}
           >
             {isLoading.profile ? 'Updating...' : 'Change Avatar'}
@@ -411,11 +423,80 @@ const ProfileSection = () => {
   );
 };
 
+// --- MODIFIED AddressesSection component ---
 const AddressesSection = () => {
-    const { addresses, handleAddAddressClick, handleEditAddressClick, handleDeleteAddress, handleSetDefaultAddress, isLoading, error } = useDashboard();
-    if (isLoading.addresses && !addresses.length) return <p>Loading addresses...</p>; if (error.addresses && !addresses.length) return <p>Error: {error.addresses}</p>; if (!isLoading.addresses && (!addresses || addresses.length === 0)) return <p>No addresses saved.</p>;
-    return ( <div className="addresses-section"><h2>Delivery Strongholds</h2><button className="primary-button add-address" onClick={handleAddAddressClick} style={{ marginBottom: '20px' }} disabled={isLoading.addresses}>{isLoading.addresses ? "Loading..." : "Add New Address"}</button>{!isLoading.addresses && (!addresses || addresses.length === 0) && (<p>No addresses saved. Add one to get started!</p>)}<div className="addresses-container">{addresses && addresses.map((address) => (<div key={address.AddressID} className={`address-card ${address.IsDefault ? 'default-address' : ''}`} tabIndex="0">{address.IsDefault && <div className="default-badge">Default</div>}<h3>{address.Nickname || `Address`}</h3><div className="address-details"><p><strong>Recipient:</strong> {address.RecipientName}</p><p>{address.Line1}</p>{address.Line2 && <p>{address.Line2}</p>}<p>{address.City}, {address.Region && `${address.Region}, `}{address.PostalCode}</p><p>{address.Country}</p><p><strong>Phone:</strong> {address.ContactPhone}</p></div><div className="address-actions"><button className="secondary-button" onClick={() => handleEditAddressClick(address)} disabled={isLoading.addresses}>Edit</button><button className="secondary-button delete-btn" onClick={() => handleDeleteAddress(address.AddressID)} disabled={isLoading.addresses}>Delete</button>{!address.IsDefault && (<button className="secondary-button" onClick={() => handleSetDefaultAddress(address.AddressID)} disabled={isLoading.addresses}>Set as Default</button>)}</div></div>))}</div></div> );
+  const { 
+    addresses, 
+    handleAddAddressClick, 
+    handleEditAddressClick,
+    handleDeleteAddress, 
+    handleSetDefaultAddress, 
+    isLoading, 
+    error 
+  } = useDashboard();
+
+  // Scenario 1: Initial loading of addresses (addresses array is not yet populated or undefined)
+  if (isLoading.addresses && (!addresses || addresses.length === 0)) {
+    return <p>Loading addresses...</p>;
+  }
+
+  // Scenario 2: Error loading addresses initially (addresses array is not populated or undefined)
+  if (error.addresses && (!addresses || addresses.length === 0)) {
+    return <p>Error loading addresses: {error.addresses}</p>;
+  }
+
+  // Scenario 3: Addresses loaded (could be an empty array or have items),
+  // or an operation is in progress (isLoading.addresses is true) but we might already have some addresses to show.
+  return (
+    <div className="addresses-section">
+      <h2>Delivery Strongholds</h2>
+      <button 
+        className="primary-button add-address" 
+        onClick={handleAddAddressClick} 
+        style={{ marginBottom: '20px' }} 
+        disabled={isLoading.addresses} // Disable button during any address operation
+      >
+        {isLoading.addresses ? "Processing..." : "Add New Address"}
+      </button>
+
+      {/* Show error message if a recent address operation failed, even if some addresses are displayed */}
+      {error.addresses && addresses && addresses.length > 0 && (
+        <p className="error-message" style={{color: 'red', marginBottom: '15px'}}>Error with address operation: {error.addresses}</p>
+      )}
+
+      {/* Conditionally show "No addresses saved" message if not loading and no addresses */}
+      {!isLoading.addresses && (!addresses || addresses.length === 0) && (
+        <p>No addresses saved. Add one to get started!</p>
+      )}
+
+      <div className="addresses-container">
+        {/* Only map addresses if they exist and there are addresses to show */}
+        {addresses && addresses.length > 0 && addresses.map((address) => (
+          <div key={address.AddressID} className={`address-card ${address.IsDefault ? 'default-address' : ''}`} tabIndex="0">
+            {address.IsDefault && <div className="default-badge">Default</div>}
+            <h3>{address.Nickname || `Address`}</h3>
+            <div className="address-details">
+              <p><strong>Recipient:</strong> {address.RecipientName}</p>
+              <p>{address.Line1}</p>
+              {address.Line2 && <p>{address.Line2}</p>}
+              <p>{address.City}, {address.Region && `${address.Region}, `}{address.PostalCode}</p>
+              <p>{address.Country}</p>
+              <p><strong>Phone:</strong> {address.ContactPhone}</p>
+            </div>
+            <div className="address-actions">
+              <button className="secondary-button" onClick={() => handleEditAddressClick(address)} disabled={isLoading.addresses}>Edit</button>
+              <button className="secondary-button delete-btn" onClick={() => handleDeleteAddress(address.AddressID)} disabled={isLoading.addresses}>Delete</button>
+              {!address.IsDefault && (
+                <button className="secondary-button" onClick={() => handleSetDefaultAddress(address.AddressID)} disabled={isLoading.addresses}>Set as Default</button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
+// --- END OF MODIFIED AddressesSection component ---
 
 const Dashboard = () => {
   return ( <DashboardProvider><DashboardContent /></DashboardProvider> );
