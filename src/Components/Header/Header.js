@@ -93,15 +93,7 @@ const Header = () => {
       </div>
 
       <div className="the-header-right">
-        <form className="search-bar" onSubmit={handleSearch}>
-          <input
-            type="text"
-            placeholder="Search products..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <button type="submit"><FaSearch /></button>
-        </form>
+
 
         <button className="cart-btn" onClick={handleCartClick}>
           <CartIcon className="cart-icon" />

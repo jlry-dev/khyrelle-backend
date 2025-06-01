@@ -23,37 +23,42 @@ const Search = () => {
   const fetchSearchResults = useCallback(async (page) => {
     setIsLoading(true);
     setError(null);
-    
     try {
-     const response = await fetch(`/api/products/search?q=${encodeURIComponent(query)}`);
+  // The backend route is /api/products/search?q=...
+  const response = await fetch(`/api/products/search?q=${encodeURIComponent(query)}`); // Ensure query is URI encoded
 
-      if (!response.ok) {
-        throw new Error(`Search failed with status: ${response.status}`);
-      }
-      
-      const { results, pagination: paginationData } = await response.json();
-      
-      const processedResults = results.map(product => ({
-        ...product,
-        image: productImages[product.ImagePath] || productImages['default_placeholder.png'],
-        price: Number(product.Price) || 0
-      }));
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: `Search failed with status: ${response.status}` }));
+    throw new Error(errorData.message);
+  }
 
-      setSearchResults(processedResults);
-      setPagination({
-        page: paginationData.page,
-        limit: paginationData.limit,
-        total: paginationData.total,
-        totalPages: paginationData.totalPages
-      });
+  // Backend directly returns an array of results, not an object with 'results' and 'pagination'
+  const resultsArray = await response.json(); // Expecting an array directly
 
-    } catch (err) {
-      console.error("Search error:", err);
-      setError(err.message);
-      setSearchResults([]);
-    } finally {
-      setIsLoading(false);
-    }
+  const processedResults = resultsArray.map(product => ({
+    ...product,
+    image: productImages[product.ImagePath] || productImages['default_placeholder.png'] || '/placeholder.png', // Added a final fallback
+    price: Number(product.Price) || 0
+  }));
+
+  setSearchResults(processedResults);
+
+  // Since backend doesn't send pagination, set a simple pagination state based on current results
+  setPagination({
+    page: 1, // Assuming all results are on one page for now
+    limit: processedResults.length,
+    total: processedResults.length,
+    totalPages: 1
+  });
+
+} catch (err) {
+  console.error("Search error:", err);
+  setError(err.message);
+  setSearchResults([]);
+} finally {
+  setIsLoading(false);
+}
+
   }, [query]);
 
   useEffect(() => {

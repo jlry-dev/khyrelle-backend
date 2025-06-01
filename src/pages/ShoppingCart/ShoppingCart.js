@@ -79,7 +79,7 @@ export default function ShoppingCart() {
     <div className="shopping-cart-container">
       <header className="cart-header">
         <h1>Your Shopping Cart</h1>
-        <div className="cart-count">Items: {itemCount}</div>
+       
       </header>
       
       <div className="main-container">

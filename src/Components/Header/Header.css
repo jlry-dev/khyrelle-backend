@@ -93,7 +93,11 @@
   border: none;
   cursor: pointer;
 }
+.cart-item-count {
 
+    color: white;
+
+}
 .cart-icon {
   width: 28px;
   height: 28px;

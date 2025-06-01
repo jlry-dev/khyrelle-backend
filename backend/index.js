@@ -46,7 +46,7 @@ dbPool.getConnection()
     console.error('Error connecting to the database:', err.stack);
   });
 
-// --- Authentication Middleware (Placeholder - Needs Real Auth for Production) ---
+// --- Authentication Middleware (Placeholder - Updated for stricter checking) ---
 const authenticateUser = (req, res, next) => {
   const userIdFromHeader = req.headers['temp-user-id'];
 
@@ -167,24 +167,54 @@ app.get('/api/products/:id', async (req, res) => {
   } finally {
     if (connection) connection.release();
   }
-});
-app.get('/api/products/search', async (req, res) => {
-  const searchTerm = req.query.q; 
+});app.get('/api/products/search', async (req, res) => {
+  const searchTerm = req.query.q;
+  // Basic pagination parameters (can be extended to be passed as query params e.g. ?q=sword&page=1&limit=10)
+  const page = 1; // For now, hardcode to page 1
+  const limit = 100; // Show up to 100 results by default, or all if less
+  const offset = (page - 1) * limit;
+
   if (!searchTerm || typeof searchTerm !== 'string' || searchTerm.trim() === '') {
     return res.status(400).json({ message: 'Search term is required.' });
   }
   let connection;
   try {
     connection = await dbPool.getConnection();
-    const query = `
+    const searchPattern = `%${searchTerm.trim()}%`;
+
+    // Query for total count first (for pagination info)
+    const countQuery = `
+      SELECT COUNT(*) as total FROM products 
+      WHERE Name LIKE ? OR Description LIKE ? OR ItemType LIKE ? OR Material LIKE ?
+    `;
+    const [countResult] = await connection.execute(countQuery, [searchPattern, searchPattern, searchPattern, searchPattern]);
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    // Query for the actual results with limit and offset (though offset is 0 for now)
+    const resultsQuery = `
       SELECT * FROM products 
       WHERE Name LIKE ? OR Description LIKE ? OR ItemType LIKE ? OR Material LIKE ?
       ORDER BY Name ASC
+      LIMIT ? OFFSET ? 
     `;
-    const searchPattern = `%${searchTerm.trim()}%`; 
-    const [results] = await connection.execute(query, [searchPattern, searchPattern, searchPattern, searchPattern]);
-    console.log(`Search for "${searchTerm}" returned ${results.length} products.`);
-    res.status(200).json(results); 
+    // For now, we are not implementing full pagination from query params, so limit to a large number or remove limit.
+    // If you want ALL results without backend pagination for now, remove LIMIT and OFFSET.
+    // Or keep it for future use but send all data. For simplicity of current Search.js:
+    const [results] = await connection.execute(resultsQuery, [searchPattern, searchPattern, searchPattern, searchPattern, limit, offset]);
+
+    console.log(`Search for "${searchTerm}" returned ${results.length} products (total matching: ${total}).`);
+
+    // Send response in the format Search.js expects
+    res.status(200).json({
+      results: results,
+      pagination: {
+        page: page,
+        limit: limit,
+        total: total,
+        totalPages: totalPages
+      }
+    }); 
   } catch (error) {
     console.error('Error during product search:', error);
     res.status(500).json({ message: 'Failed to search for products.' });
@@ -380,31 +410,37 @@ app.delete('/api/cart', authenticateUser, async (req, res) => {
 
 
 // USER PROFILE & DASHBOARD API Routes
-app.get('/api/user/profile', authenticateUser, async (req, res) => { 
+app.get('/api/user/profile', authenticateUser, async (req, res) => {
     if (!req.user || !req.user.CustomerID) return res.status(401).json({ message: "User not properly authenticated." });
     const customerId = req.user.CustomerID;
     let connection;
     try {
         connection = await dbPool.getConnection();
+        // Include AvatarURL in the SELECT statement
         const [rows] = await connection.execute(
-            'SELECT CustomerID, firstName, lastName, userEmail, PhoneNumber FROM `customer` WHERE `CustomerID` = ?',
+            'SELECT CustomerID, firstName, lastName, userEmail, PhoneNumber, AvatarURL FROM `customer` WHERE `CustomerID` = ?',
             [customerId]
         );
         if (rows.length === 0) return res.status(404).json({ message: 'User profile not found.' });
         const userProfile = rows[0];
         res.status(200).json({
-            firstName: userProfile.firstName, lastName: userProfile.lastName,
-            email: userProfile.userEmail, phone: userProfile.PhoneNumber || ''
+            firstName: userProfile.firstName,
+            lastName: userProfile.lastName,
+            email: userProfile.userEmail,
+            phone: userProfile.PhoneNumber || '',
+            avatarUrl: userProfile.AvatarURL || '' // Add avatarUrl to the response
         });
     } catch (error) {
         console.error(`Error fetching profile for CustomerID ${customerId}:`, error);
         res.status(500).json({ message: 'Failed to retrieve user profile.' });
     } finally { if (connection) connection.release(); }
 });
-app.put('/api/user/profile', authenticateUser, async (req, res) => { 
+
+app.put('/api/user/profile', authenticateUser, async (req, res) => {
+    // ... (existing code for updating name/phone remains the same)
     if (!req.user || !req.user.CustomerID) return res.status(401).json({ message: "User not properly authenticated." });
     const customerId = req.user.CustomerID;
-    const { firstName, lastName, phone } = req.body;
+    const { firstName, lastName, phone } = req.body; // Avatar is handled by a separate endpoint now
     if (!firstName || !lastName) return res.status(400).json({ message: 'First name and last name are required.' });
     let connection;
     try {
@@ -413,11 +449,60 @@ app.put('/api/user/profile', authenticateUser, async (req, res) => {
             'UPDATE `customer` SET `firstName` = ?, `lastName` = ?, `PhoneNumber` = ? WHERE `CustomerID` = ?',
             [firstName, lastName, phone || null, customerId]
         );
-        res.status(200).json({ message: 'Profile updated successfully.' });
+        // Fetch the updated profile to send back, including the avatar URL which wasn't changed here
+        const [updatedRows] = await connection.execute(
+             'SELECT CustomerID, firstName, lastName, userEmail, PhoneNumber, AvatarURL FROM `customer` WHERE `CustomerID` = ?',
+            [customerId]
+        );
+        const updatedProfile = updatedRows[0];
+        res.status(200).json({ 
+            message: 'Profile updated successfully.',
+            user: {
+                firstName: updatedProfile.firstName,
+                lastName: updatedProfile.lastName,
+                email: updatedProfile.userEmail,
+                phone: updatedProfile.PhoneNumber || '',
+                avatarUrl: updatedProfile.AvatarURL || ''
+            }
+        });
     } catch (error) {
         console.error(`Error updating profile for CustomerID ${customerId}:`, error);
         res.status(500).json({ message: 'Failed to update profile.' });
     } finally { if (connection) connection.release(); }
+});
+
+// ADD THIS NEW ENDPOINT FOR AVATAR UPDATE
+app.put('/api/user/avatar', authenticateUser, async (req, res) => {
+    if (!req.user || !req.user.CustomerID) {
+        return res.status(401).json({ message: "User not properly authenticated." });
+    }
+    const customerId = req.user.CustomerID;
+    const { avatarUrl } = req.body;
+
+    if (typeof avatarUrl !== 'string') { // Basic validation
+        return res.status(400).json({ message: "Avatar URL must be a string." });
+    }
+    // More robust URL validation could be added here if desired
+
+    let connection;
+    try {
+        connection = await dbPool.getConnection();
+        const [result] = await connection.execute(
+            'UPDATE `customer` SET `AvatarURL` = ? WHERE `CustomerID` = ?',
+            [avatarUrl.trim() || null, customerId] // Store trimmed URL or null if empty
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "User not found." });
+        }
+
+        res.status(200).json({ message: 'Avatar updated successfully.', avatarUrl: avatarUrl.trim() || null });
+    } catch (error) {
+        console.error(`Error updating avatar for CustomerID ${customerId}:`, error);
+        res.status(500).json({ message: 'Failed to update avatar.' });
+    } finally {
+        if (connection) connection.release();
+    }
 });
 app.post('/api/user/password', authenticateUser, async (req, res) => { 
     if (!req.user || !req.user.CustomerID) return res.status(401).json({ message: "User not properly authenticated." });
@@ -477,10 +562,207 @@ app.get('/api/user/orders', authenticateUser, async (req, res) => {
 });
 
 // ADDRESS API Routes (Placeholders - require customer_addresses table and full implementation)
-app.get('/api/user/addresses', authenticateUser, (req, res) => res.status(501).json({message: "Addresses GET not implemented"}));
-app.post('/api/user/addresses', authenticateUser, (req, res) => res.status(501).json({message: "Addresses POST not implemented"}));
-app.put('/api/user/addresses/:addressId', authenticateUser, (req, res) => res.status(501).json({message: "Addresses PUT not implemented"}));
-app.delete('/api/user/addresses/:addressId', authenticateUser, (req, res) => res.status(501).json({message: "Addresses DELETE not implemented"}));
+app.get('/api/user/addresses', authenticateUser, async (req, res) => {
+    if (!req.user || !req.user.CustomerID) {
+        return res.status(401).json({ message: "User not authenticated." });
+    }
+    const customerId = req.user.CustomerID;
+    let connection;
+    try {
+        connection = await dbPool.getConnection();
+        const [addresses] = await connection.execute(
+            'SELECT * FROM `customer_addresses` WHERE `CustomerID` = ? ORDER BY `IsDefault` DESC, `AddressID` ASC', 
+            [customerId]
+        );
+        res.status(200).json(addresses);
+    } catch (error) {
+        console.error(`Error fetching addresses for CustomerID ${customerId}:`, error);
+        // Send 501 if table doesn't exist, otherwise 500
+        if (error.code === 'ER_NO_SUCH_TABLE') {
+            return res.status(501).json({message: "Addresses feature not fully set up (table missing)."});
+        }
+        res.status(500).json({ message: 'Failed to retrieve addresses.' });
+    } finally {
+        if (connection) connection.release();
+    }
+});
+// MAKE SURE TO IMPLEMENT THE ACTUAL DATABASE LOGIC FOR THESE
+app.put('/api/user/addresses/:addressId', authenticateUser, async (req, res) => {
+    if (!req.user || !req.user.CustomerID) return res.status(401).json({ message: "User not authenticated." });
+    const customerId = req.user.CustomerID;
+    const { addressId } = req.params;
+    const { Nickname, RecipientName, ContactPhone, Line1, Line2, City, Region, PostalCode, Country, IsDefault } = req.body;
+
+    if (!RecipientName || !ContactPhone || !Line1 || !City || !PostalCode || !Country) {
+        return res.status(400).json({ message: 'Required address fields are missing.' });
+    }
+
+    let connection;
+    try {
+        connection = await dbPool.getConnection();
+        await connection.beginTransaction();
+
+        if (IsDefault) { // If this address is being set to default
+            await connection.execute(
+                'UPDATE `customer_addresses` SET `IsDefault` = FALSE WHERE `CustomerID` = ? AND `AddressID` != ?',
+                [customerId, addressId]
+            );
+        }
+
+        const [result] = await connection.execute(
+            'UPDATE `customer_addresses` SET `Nickname`=?, `RecipientName`=?, `ContactPhone`=?, `Line1`=?, `Line2`=?, `City`=?, `Region`=?, `PostalCode`=?, `Country`=?, `IsDefault`=? WHERE `AddressID` = ? AND `CustomerID` = ?',
+            [Nickname || null, RecipientName, ContactPhone, Line1, Line2 || null, City, Region || null, PostalCode, Country, IsDefault ? 1 : 0, addressId, customerId]
+        );
+
+        if (result.affectedRows === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: "Address not found or user mismatch." });
+        }
+
+        await connection.commit();
+        const [updatedAddress] = await connection.execute('SELECT * FROM `customer_addresses` WHERE `AddressID` = ?', [addressId]);
+        res.status(200).json({ message: "Address updated successfully", address: updatedAddress[0] });
+    } catch (error) {
+        if (connection) await connection.rollback();
+        console.error(`Error updating address ${addressId} for CustomerID ${customerId}:`, error);
+        if (error.code === 'ER_NO_SUCH_TABLE') {
+            return res.status(501).json({message: "Addresses feature not fully set up (table missing)."});
+        }
+        res.status(500).json({ message: 'Failed to update address.' });
+    } finally {
+        if (connection) connection.release();
+    }
+});
+
+app.delete('/api/user/addresses/:addressId', authenticateUser, async (req, res) => {
+    if (!req.user || !req.user.CustomerID) return res.status(401).json({ message: "User not authenticated." });
+    const customerId = req.user.CustomerID;
+    const { addressId } = req.params;
+
+    let connection;
+    try {
+        connection = await dbPool.getConnection();
+        // Check if the address being deleted is a default address
+        const [addressCheck] = await connection.execute(
+            'SELECT `IsDefault` FROM `customer_addresses` WHERE `AddressID` = ? AND `CustomerID` = ?',
+            [addressId, customerId]
+        );
+
+        if (addressCheck.length === 0) {
+            return res.status(404).json({ message: "Address not found or user mismatch." });
+        }
+
+        // if (addressCheck[0].IsDefault) {
+        //     return res.status(400).json({ message: "Cannot delete the default address. Set another address as default first." });
+        // } // Optional: Prevent deleting default address directly or handle by setting another as default.
+
+        const [result] = await connection.execute(
+            'DELETE FROM `customer_addresses` WHERE `AddressID` = ? AND `CustomerID` = ?',
+            [addressId, customerId]
+        );
+
+        if (result.affectedRows === 0) {
+             return res.status(404).json({ message: "Address not found or user mismatch (already deleted?)." });
+        }
+        res.status(200).json({ message: "Address deleted successfully" });
+    } catch (error) {
+        console.error(`Error deleting address ${addressId} for CustomerID ${customerId}:`, error);
+         if (error.code === 'ER_NO_SUCH_TABLE') {
+            return res.status(501).json({message: "Addresses feature not fully set up (table missing)."});
+        }
+        res.status(500).json({ message: 'Failed to delete address.' });
+    } finally {
+        if (connection) connection.release();
+    }
+});
+
+app.put('/api/user/addresses/:addressId/default', authenticateUser, async (req, res) => {
+    if (!req.user || !req.user.CustomerID) return res.status(401).json({ message: "User not authenticated." });
+    const customerId = req.user.CustomerID;
+    const { addressId } = req.params;
+
+    let connection;
+    try {
+        connection = await dbPool.getConnection();
+        await connection.beginTransaction();
+
+        // Set all other addresses for this customer to not be default
+        await connection.execute(
+            'UPDATE `customer_addresses` SET `IsDefault` = FALSE WHERE `CustomerID` = ?',
+            [customerId]
+        );
+
+        // Set the specified address as default
+        const [result] = await connection.execute(
+            'UPDATE `customer_addresses` SET `IsDefault` = TRUE WHERE `AddressID` = ? AND `CustomerID` = ?',
+            [addressId, customerId]
+        );
+        
+        if (result.affectedRows === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: "Address not found or user mismatch." });
+        }
+
+        await connection.commit();
+        res.status(200).json({ message: "Address set as default successfully" });
+    } catch (error) {
+        if (connection) await connection.rollback();
+        console.error(`Error setting address ${addressId} as default for CustomerID ${customerId}:`, error);
+        if (error.code === 'ER_NO_SUCH_TABLE') {
+            return res.status(501).json({message: "Addresses feature not fully set up (table missing)."});
+        }
+        res.status(500).json({ message: 'Failed to set default address.' });
+    } finally {
+        if (connection) connection.release();
+    }
+});
+app.post('/api/user/addresses', authenticateUser, async (req, res) => {
+    if (!req.user || !req.user.CustomerID) {
+        return res.status(401).json({ message: "User not authenticated." });
+    }
+    const customerId = req.user.CustomerID;
+    const { Nickname, RecipientName, ContactPhone, Line1, Line2, City, Region, PostalCode, Country, IsDefault } = req.body;
+
+    if (!RecipientName || !ContactPhone || !Line1 || !City || !PostalCode || !Country) {
+        return res.status(400).json({ message: 'Recipient name, phone, address line 1, city, postal code, and country are required.' });
+    }
+
+    let connection;
+    try {
+        connection = await dbPool.getConnection();
+        await connection.beginTransaction();
+
+        if (IsDefault) {
+            await connection.execute(
+                'UPDATE `customer_addresses` SET `IsDefault` = FALSE WHERE `CustomerID` = ?',
+                [customerId]
+            );
+        }
+
+        const [result] = await connection.execute(
+            'INSERT INTO `customer_addresses` (`CustomerID`, `Nickname`, `RecipientName`, `ContactPhone`, `Line1`, `Line2`, `City`, `Region`, `PostalCode`, `Country`, `IsDefault`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [customerId, Nickname || null, RecipientName, ContactPhone, Line1, Line2 || null, City, Region || null, PostalCode, Country, IsDefault ? 1 : 0]
+        );
+        const newAddressId = result.insertId;
+        await connection.commit();
+
+        const [newAddress] = await connection.execute('SELECT * FROM `customer_addresses` WHERE `AddressID` = ?', [newAddressId]);
+        res.status(201).json({ message: 'Address added successfully.', address: newAddress[0] });
+
+    } catch (error) {
+        if (connection) await connection.rollback();
+        console.error(`Error adding address for CustomerID ${customerId}:`, error);
+        if (error.code === 'ER_NO_SUCH_TABLE') {
+            return res.status(501).json({message: "Addresses feature not fully set up (table missing)."});
+        }
+        res.status(500).json({ message: 'Failed to add address.' });
+    } finally {
+        if (connection) connection.release();
+    }
+});
+// --- Placeholder for PUT, DELETE, Set Default Address ---
+app.put('/api/user/addresses/:addressId', authenticateUser, (req, res) => res.status(501).json({message: "Update address not implemented"}));
+app.delete('/api/user/addresses/:addressId', authenticateUser, (req, res) => res.status(501).json({message: "Delete address not implemented"}));
 app.put('/api/user/addresses/:addressId/default', authenticateUser, (req, res) => res.status(501).json({message: "Set default address not implemented"}));
 
 

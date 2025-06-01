@@ -1,436 +1,424 @@
-// src/pages/Dashboard/Dashboard.js
-import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import './Dashboard.css'; 
-import { useAuth } from '../../data/AuthProvider'; 
-import { productImages } from '../../utils/productImages'; // For displaying item images in order history
+import React, { useState, useCallback, createContext, useContext, useEffect } from 'react';
+import './Dashboard.css';
+import { useAuth } from '../../data/AuthProvider'; // MAKE SURE THIS PATH IS CORRECT
+import { productImages } from '../../utils/productImages'; // Your imported image utility
+import cloud1 from '../../assets/cloud1.png'; // This path seems fine based on your CSS
 
-import cloud1 from '../../assets/cloud1.png'; // Assuming path is correct relative to src/pages/Dashboard/
+const DashboardContext = createContext();
 
-const DashboardContext = createContext(null);
-
-// This hook will fetch and manage all data specific to the dashboard for the logged-in user
-const useDashboardData = () => {
-  const { user, isAuthenticated, isLoading: isLoadingAuth } = useAuth(); 
-  const [userOrders, setUserOrders] = useState([]);
-  const [userProfileData, setUserProfileData] = useState({
-    firstName: '', lastName: '', email: '', phone: ''
-  });
-  const [addresses, setAddresses] = useState([]); 
-  const [isLoadingData, setIsLoadingData] = useState(true); 
-  const [error, setError] = useState(null);
-
-  // Calculated dashboard stats
-  const [totalOrdersPlaced, setTotalOrdersPlaced] = useState(0); 
-  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
-  const [recentActivities, setRecentActivities] = useState([]);
-
-  // API_BASE_URL is no longer needed here as we'll use relative paths for proxy
-  // const API_BASE_URL = process.env.REACT_APP_API_BASE_URL; 
-
-  const getAuthHeaders = useCallback(() => {
-    const headers = { 'Content-Type': 'application/json' };
-    const token = localStorage.getItem('authToken'); 
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    } else if (user?.CustomerID && typeof user.CustomerID === 'number' && !isNaN(user.CustomerID)) { 
-        console.log(`Dashboard/getAuthHeaders: Setting 'temp-user-id' to ${user.CustomerID}`);
-        headers['temp-user-id'] = user.CustomerID;
-    } else {
-        console.warn("Dashboard/getAuthHeaders: No valid CustomerID in user object or no token. Header for user ID not set.", {user});
-    }
-    return headers;
-  }, [user, isAuthenticated]); 
-
-  useEffect(() => {
-    console.log("Dashboard/useDashboardData useEffect: Auth state update:", 
-      { isLoadingAuth, isAuthenticated, customerID: user?.CustomerID, userObj: user }
-    );
-
-    if (isLoadingAuth) {
-      console.log("Dashboard/useDashboardData: Auth is still loading. Waiting...");
-      setIsLoadingData(true); 
-      return; 
-    }
-
-    if (isAuthenticated && user?.CustomerID && typeof user.CustomerID === 'number' && !isNaN(user.CustomerID)) {
-      setIsLoadingData(true);
-      setError(null);
-      console.log(`Dashboard/useDashboardData: Auth confirmed. Fetching data for CustomerID: ${user.CustomerID}`);
-      
-      const fetchData = async () => {
-        const headers = getAuthHeaders();
-        
-        if (!headers['temp-user-id'] && !headers['Authorization'] ) { 
-            console.error("Dashboard/fetchData: CRITICAL - No authentication identifier (temp-user-id or Authorization token) in headers. Aborting fetch.");
-            setError("User authentication identifier is missing. Cannot fetch dashboard data.");
-            setIsLoadingData(false);
-            return;
-        }
-        console.log("Dashboard/fetchData: Attempting to fetch with headers:", JSON.stringify(headers));
-
-        try {
-          // Use relative paths for API calls, assuming proxy is set up in package.json
-          const [profileRes, ordersRes, addressesRes] = await Promise.all([
-            fetch(`/api/user/profile`, { headers }).catch(e => { console.error("Profile fetch network error:", e); return {ok: false, statusText: e.message, status: 503, json: () => Promise.resolve({message: e.message})} ;}),
-            fetch(`/api/user/orders`, { headers }).catch(e => { console.error("Orders fetch network error:", e); return {ok: false, statusText: e.message, status: 503, json: () => Promise.resolve({message: e.message})} ;}),
-            fetch(`/api/user/addresses`, { headers }).catch(e => { console.error("Addresses fetch network error:", e); return {ok: false, statusText: e.message, status: 503, json: () => Promise.resolve({message: e.message})} ;})
-          ]);
-
-          // Process Profile
-          if (!profileRes.ok) {
-            const profileErrData = await profileRes.json().catch(() => ({message: `Profile fetch failed with status: ${profileRes.status}`}));
-            throw new Error(`Failed to fetch profile: ${profileErrData.message || profileRes.statusText} (${profileRes.status})`);
-          }
-          const profileData = await profileRes.json();
-          setUserProfileData({
-            firstName: profileData.firstName || user.firstName || '',
-            lastName: profileData.lastName || user.lastName || '',
-            email: profileData.email || user.email || '', 
-            phone: profileData.phone || ''
-          });
-
-          // Process Orders
-          if (!ordersRes.ok) {
-            const ordersErrData = await ordersRes.json().catch(() => ({message: `Orders fetch failed with status: ${ordersRes.status}`}));
-            throw new Error(`Failed to fetch orders: ${ordersErrData.message || ordersRes.statusText} (${ordersRes.status})`);
-          }
-          const ordersData = await ordersRes.json();
-          const processedOrders = ordersData.map(order => ({
-            ...order, total: Number(order.total) || 0, date: order.date, 
-            items: (order.items || []).map(item => ({ 
-              ...item, image: productImages[item.imagePath] || productImages['default_placeholder.png'],
-              price: Number(item.price) || 0
-            }))
-          }));
-          setUserOrders(processedOrders);
-          setTotalOrdersPlaced(processedOrders.length);
-          const totalSpent = processedOrders.reduce((sum, order) => sum + order.total, 0);
-          setLoyaltyPoints(Math.floor(totalSpent * 0.10));
-          setRecentActivities(processedOrders.slice(0, 3).map(o => ({ type: 'order', description: `Order #${o.id} status: ${o.status}`, date: o.date, id: o.id })));
-          
-          // Process Addresses
-          if (addressesRes.ok) {
-            const addressesData = await addressesRes.json();
-            if (addressesData.message === "Addresses GET not implemented") { setAddresses([]); } 
-            else { setAddresses(addressesData); }
-          } else { console.warn(`Failed to fetch addresses. API might not be ready.`); setAddresses([]); }
-
-        } catch (err) {
-          console.error("Dashboard/fetchData: Error during API calls:", err);
-          setError(err.message || "Could not load dashboard data.");
-        } finally {
-          setIsLoadingData(false);
-        }
-      };
-      fetchData();
-    } else if (!isLoadingAuth && !isAuthenticated) {
-      console.log("Dashboard/useDashboardData: User not authenticated. Clearing data.");
-      setIsLoadingData(false); 
-      setUserOrders([]); setUserProfileData({ firstName: '', lastName: '', email: '', phone: ''});
-      setAddresses([]); setTotalOrdersPlaced(0); setLoyaltyPoints(0); setRecentActivities([]);
-    }
-  }, [isAuthenticated, user, isLoadingAuth, getAuthHeaders]); 
-  
-  return { 
-    userOrders, setUserOrders, userProfileData, setUserProfileData, addresses, setAddresses,
-    isLoadingData, error, totalOrdersPlaced, loyaltyPoints, recentActivities, getAuthHeaders 
+// Helper function for API calls
+const fetchApi = async (url, options = {}, customerId) => {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
   };
+  if (customerId) {
+    headers['temp-user-id'] = customerId;
+  }
+
+  const response = await fetch(url, { ...options, headers });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: response.statusText }));
+    throw new Error(errorData.message || `API request failed with status ${response.status}`);
+  }
+  return response.json();
 };
 
 
 const DashboardProvider = ({ children }) => {
-  const dashboardDataHook = useDashboardData();
+  const { user, isAuthenticated, handleLogout: authHandleLogout } = useAuth(); // Get user from AuthProvider
+
   const [activeSection, setActiveSection] = useState('dashboard');
-  const { user, logout } = useAuth(); 
-  const navigate = useNavigate(); 
-  // API_BASE_URL removed
+  const [profile, setProfile] = useState({ firstName: '', lastName: '', email: '', phone: '', avatarUrl: '' });
+  const [orders, setOrders] = useState([]);
+  const [addresses, setAddresses] = useState([]);
+  const [isLoading, setIsLoading] = useState({
+    profile: false,
+    orders: false,
+    addresses: false,
+  });
+  const [error, setError] = useState({
+    profile: null,
+    orders: null,
+    addresses: null,
+  });
 
-  const handleLogout = () => { logout(); navigate("/login"); };
-  const handleShopNow = () => navigate('/products');
-  const handleTrackOrder = (orderId) => navigate('/ordertrack', { state: { orderId } });
-  const handleBuyAgain = (orderId) => alert('Buy Again feature coming soon!');
-  const handleCancelOrder = (orderId) => alert('Order cancellation feature coming soon!');
-  const handleChangeAvatar = () => alert('Avatar change coming soon!');
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(null); // null for new, address object for editing
 
-  const handleSaveProfile = async (profileToSave) => {
-    if (!user?.CustomerID) { alert("Not authenticated."); return false; }
-    try {
-      const response = await fetch(`/api/user/profile`, { // Relative path
-        method: 'PUT', headers: dashboardDataHook.getAuthHeaders(), body: JSON.stringify(profileToSave)
-      });
-      const responseData = await response.json();
-      if (!response.ok) throw new Error(responseData.message || "Failed to save profile.");
-      dashboardDataHook.setUserProfileData(prev => ({...prev, ...profileToSave, email: prev.email})); 
-      alert('Profile changes saved successfully!'); return true;
-    } catch (error) { console.error("Error saving profile:", error); alert(`Failed to save profile: ${error.message}`); return false; }
+  const customerId = user?.CustomerID;
+
+  // Fetch Profile
+  useEffect(() => {
+    if (isAuthenticated && customerId) {
+      setIsLoading(prev => ({ ...prev, profile: true }));
+      setError(prev => ({ ...prev, profile: null }));
+      fetchApi('/api/user/profile', {}, customerId)
+        .then(data => setProfile(data))
+        .catch(err => setError(prev => ({ ...prev, profile: err.message })))
+        .finally(() => setIsLoading(prev => ({ ...prev, profile: false })));
+    }
+  }, [isAuthenticated, customerId]);
+
+  // Fetch Orders
+  useEffect(() => {
+    if (isAuthenticated && customerId) {
+      setIsLoading(prev => ({ ...prev, orders: true }));
+      setError(prev => ({ ...prev, orders: null }));
+      fetchApi('/api/user/orders', {}, customerId)
+        .then(data => {
+          const updatedOrders = data.map(order => ({
+            ...order,
+            items: order.items.map(item => {
+              const imageName = item.ImagePath;
+              let resolvedImageSrc = productImages[imageName] || '/placeholder.png';
+              if (imageName && !productImages.hasOwnProperty(imageName)) {
+                // console.warn(`[Dashboard Image] WARNING: Image '${imageName}' for item '${item.ProductName}' NOT found in productImages. Using placeholder.`);
+              } else if (!imageName) {
+                //  console.warn(`[Dashboard Image] WARNING: No ImagePath provided from backend for item '${item.ProductName}'. Using placeholder.`);
+              }
+              return { ...item, image: resolvedImageSrc };
+            })
+          }));
+          setOrders(updatedOrders);
+        })
+        .catch(err => {
+            setError(prev => ({ ...prev, orders: err.message }));
+            console.error("Error fetching or processing orders for dashboard:", err);
+        })
+        .finally(() => setIsLoading(prev => ({ ...prev, orders: false })));
+    }
+  }, [isAuthenticated, customerId]);
+
+  // Fetch Addresses
+  const fetchAddresses = useCallback(() => {
+    if (isAuthenticated && customerId) {
+      setIsLoading(prev => ({ ...prev, addresses: true }));
+      setError(prev => ({ ...prev, addresses: null }));
+      fetchApi('/api/user/addresses', {}, customerId)
+        .then(data => setAddresses(data || []))
+        .catch(err => setError(prev => ({ ...prev, addresses: err.message })))
+        .finally(() => setIsLoading(prev => ({ ...prev, addresses: false })));
+    }
+  }, [isAuthenticated, customerId]);
+
+  useEffect(() => {
+    fetchAddresses();
+  }, [fetchAddresses]);
+
+
+  const getStatusClass = useCallback((status) => {
+    switch (status?.toLowerCase()) {
+      case 'completed': return 'status-completed';
+      case 'shipped': return 'status-shipped';
+      case 'processing': return 'status-processing';
+      case 'pending': return 'status-processing';
+      default: return '';
+    }
+  }, []);
+
+  const handleLogout = () => {
+    authHandleLogout();
   };
-  
-  const handleChangePassword = async (currentPassword, newPassword) => {
-    if (!user?.CustomerID) { alert("Not authenticated."); return false; }
-    try {
-        const response = await fetch(`/api/user/password`, { // Relative path
-            method: 'POST', headers: dashboardDataHook.getAuthHeaders(), body: JSON.stringify({ currentPassword, newPassword })
-        });
-        const responseData = await response.json();
-        if (!response.ok) throw new Error(responseData.message || "Failed to change password.");
-        alert("Password changed successfully!"); return true;
-    } catch (error) { console.error("Error changing password:", error); alert(`Password change failed: ${error.message}`); return false;}
+
+  const handleAddAddressClick = () => {
+    setEditingAddress(null);
+    setShowAddressModal(true);
   };
 
-  const handleAddAddress = async (newAddress) => alert('Add address API not implemented.'); 
-  const handleEditAddress = async (addressId, updatedAddress) => alert('Edit address API not implemented.'); 
-  const handleDeleteAddress = async (addressId) => { if(window.confirm('Sure?')) alert('Delete address API not implemented.'); };
-  const handleSetDefaultAddress = async (addressId) => alert('Set default address API not implemented.');
+  const handleEditAddressClick = (address) => {
+    setEditingAddress(address);
+    setShowAddressModal(true);
+  };
+
+  const handleSaveAddress = async (addressData) => {
+    if (!customerId) { alert("User not authenticated."); return; }
+    setIsLoading(prev => ({ ...prev, addresses: true }));
+    try {
+      if (editingAddress && editingAddress.AddressID) {
+        await fetchApi(`/api/user/addresses/${editingAddress.AddressID}`, { method: 'PUT', body: JSON.stringify(addressData), }, customerId);
+        alert('Address updated successfully!');
+      } else {
+        await fetchApi('/api/user/addresses', { method: 'POST', body: JSON.stringify(addressData), }, customerId);
+        alert('Address added successfully!');
+      }
+      setShowAddressModal(false); setEditingAddress(null); fetchAddresses();
+    } catch (err) {
+      setError(prev => ({ ...prev, addresses: err.message })); alert(`Error saving address: ${err.message}`);
+    } finally { setIsLoading(prev => ({ ...prev, addresses: false })); }
+  };
+
+  const handleDeleteAddress = async (addressId) => {
+    if (!customerId) { alert("User not authenticated."); return; }
+    if (window.confirm('Are you sure you want to delete this address?')) {
+      setIsLoading(prev => ({ ...prev, addresses: true }));
+      try {
+        await fetchApi(`/api/user/addresses/${addressId}`, { method: 'DELETE' }, customerId);
+        alert('Address deleted successfully!'); fetchAddresses();
+      } catch (err) {
+        setError(prev => ({ ...prev, addresses: err.message })); alert(`Error deleting address: ${err.message}`);
+      } finally { setIsLoading(prev => ({ ...prev, addresses: false })); }
+    }
+  };
+
+  const handleSetDefaultAddress = async (addressId) => {
+    if (!customerId) { alert("User not authenticated."); return; }
+    setIsLoading(prev => ({ ...prev, addresses: true }));
+    try {
+      await fetchApi(`/api/user/addresses/${addressId}/default`, { method: 'PUT' }, customerId);
+      alert('Address set as default!'); fetchAddresses();
+    } catch (err) {
+      setError(prev => ({ ...prev, addresses: err.message })); alert(`Error setting default address: ${err.message}`);
+    } finally { setIsLoading(prev => ({ ...prev, addresses: false })); }
+  };
+
+  const handleShopNow = () => { alert('Redirecting to shop page (not implemented)'); };
+  const handleViewDetails = () => { alert('Showing product details (not implemented)'); };
+  const handleTrackOrder = (orderId) => { alert(`Tracking order ${orderId} (not implemented)`); };
+  const handleBuyAgain = (orderId) => { alert(`Adding items from order ${orderId} to cart (not implemented)`); };
+  const handleCancelOrder = (orderId) => { alert(`Canceling order ${orderId} (not implemented)`); };
   
-  const value = {
-    ...dashboardDataHook, activeSection, setActiveSection,
-    getStatusClass: useCallback((status) => { 
-        switch (status?.toLowerCase()) {
-            case 'completed': return 'status-completed'; case 'shipped': return 'status-shipped';
-            case 'processing': return 'status-processing'; case 'pending': return 'status-pending';
-            case 'cancelled': return 'status-cancelled'; default: return '';
+  const handleChangeAvatar = async () => {
+    if (!customerId) {
+      alert("User not authenticated.");
+      return;
+    }
+    const newAvatarUrl = window.prompt("Enter the URL for your new avatar image:", profile.avatarUrl || '');
+    if (newAvatarUrl !== null) { 
+        if (newAvatarUrl.trim() === '' && !window.confirm("You entered an empty URL. This will remove your current avatar. Continue?")) {
+            return; 
         }
-    }, []),
-    handleLogout, handleShopNow, handleTrackOrder, handleBuyAgain, handleCancelOrder,
-    handleChangeAvatar, handleSaveProfile, handleChangePassword,
-    handleAddAddress, handleEditAddress, handleDeleteAddress, handleSetDefaultAddress
+      setIsLoading(prev => ({ ...prev, profile: true }));
+      try {
+        const response = await fetchApi('/api/user/avatar', {
+          method: 'PUT',
+          body: JSON.stringify({ avatarUrl: newAvatarUrl.trim() })
+        }, customerId);
+        setProfile(prev => ({ ...prev, avatarUrl: response.avatarUrl })); 
+        alert('Avatar updated successfully!');
+      } catch (err) {
+        setError(prev => ({ ...prev, profile: err.message }));
+        alert(`Error updating avatar: ${err.message}`);
+      } finally {
+        setIsLoading(prev => ({ ...prev, profile: false }));
+      }
+    }
   };
-  return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;
+  
+  const handleSaveProfile = async (profileData) => {
+    if (!customerId) { alert("User not authenticated."); return; }
+    setIsLoading(prev => ({ ...prev, profile: true }));
+    try {
+        const { firstName, lastName, phone } = profileData;
+        const apiResponse = await fetchApi('/api/user/profile', {
+            method: 'PUT',
+            body: JSON.stringify({ firstName, lastName, phone })
+        }, customerId);
+        setProfile(apiResponse.user); 
+        alert("Profile updated successfully!");
+    } catch (err) {
+        setError(prev => ({...prev, profile: err.message}));
+        alert(`Error updating profile: ${err.message}`);
+    } finally { setIsLoading(prev => ({ ...prev, profile: false })); }
+  };
+
+  const handleChangePassword = async (passwordData) => {
+    if (!customerId) { alert("User not authenticated."); return; }
+    setIsLoading(prev => ({ ...prev, profile: true }));
+    try {
+        await fetchApi('/api/user/password', { method: 'POST', body: JSON.stringify(passwordData) }, customerId);
+        alert("Password changed successfully!");
+    } catch (err) {
+        setError(prev => ({...prev, profile: err.message}));
+        alert(`Error changing password: ${err.message}`);
+    } finally { setIsLoading(prev => ({ ...prev, profile: false })); }
+  };
+
+  const value = {
+    profile, setProfile, orders, addresses, activeSection, setActiveSection,
+    getStatusClass, handleLogout, handleShopNow, handleViewDetails, handleTrackOrder,
+    handleBuyAgain, handleCancelOrder, handleChangeAvatar, handleSaveProfile, handleChangePassword,
+    handleAddAddressClick, handleEditAddressClick, handleDeleteAddress, handleSetDefaultAddress,
+    showAddressModal, setShowAddressModal, editingAddress, setEditingAddress, handleSaveAddress,
+    isLoading, error,
+  };
+
+  return (<DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>);
 };
 
-const useDashboard = () => { 
+const useDashboard = () => {
   const context = useContext(DashboardContext);
-  if (!context) throw new Error('useDashboard must be used within a DashboardProvider');
+  if (!context) { throw new Error('useDashboard must be used within a DashboardProvider'); }
   return context;
 };
 
-const DashboardOverview = ({/* ...props as before... */}) => { /* ... Full JSX from previous version ... */ 
-  const { userProfileData, totalOrdersPlaced, loyaltyPoints, recentActivities, handleShopNow, setActiveSection, isLoadingData, error } = useDashboard();
-  if (isLoadingData && totalOrdersPlaced === undefined ) return <div className="loading-message">Loading dashboard overview...</div>; 
-  if (error && totalOrdersPlaced === undefined ) {
-      return <p style={{color: 'red'}}>Could not load dashboard overview data: {error}</p>;
+const AddressFormModal = ({ currentAddress, onSave, onClose }) => {
+  const [formState, setFormState] = useState({ Nickname: '', RecipientName: '', ContactPhone: '', Line1: '', Line2: '', City: '', Region: '', PostalCode: '', Country: '', IsDefault: false, });
+  useEffect(() => {
+    if (currentAddress) { setFormState({ Nickname: currentAddress.Nickname || '', RecipientName: currentAddress.RecipientName || '', ContactPhone: currentAddress.ContactPhone || '', Line1: currentAddress.Line1 || '', Line2: currentAddress.Line2 || '', City: currentAddress.City || '', Region: currentAddress.Region || '', PostalCode: currentAddress.PostalCode || '', Country: currentAddress.Country || '', IsDefault: !!currentAddress.IsDefault, }); }
+    else { setFormState({ Nickname: '', RecipientName: '', ContactPhone: '', Line1: '', Line2: '', City: '', Region: '', PostalCode: '', Country: '', IsDefault: false, }); }
+  }, [currentAddress]);
+  const handleChange = (e) => { const { name, value, type, checked } = e.target; setFormState(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value })); };
+  const handleSubmit = (e) => { e.preventDefault(); if (!formState.RecipientName || !formState.Line1 || !formState.City || !formState.PostalCode || !formState.Country || !formState.ContactPhone) { alert("Please fill in all required fields for the address (Recipient Name, Line 1, City, Postal Code, Country, Phone)."); return; } onSave(formState); };
+  const modalStyle = { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: '#2b2b2b', padding: '30px', borderRadius: '15px', zIndex: 1000, color: '#fff', border: '2px solid #89ce8c', boxShadow: '0 0 20px rgba(137, 206, 140, 0.3)', width: '90%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' };
+  const overlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 999 };
+  return ( <> <div style={overlayStyle} onClick={onClose} /> <div style={modalStyle} className="address-form-modal"> <h2>{currentAddress ? 'Edit Address' : 'Add New Address'}</h2> <form onSubmit={handleSubmit}> <div className="form-group"><label htmlFor="addrNickname">Nickname</label><input id="addrNickname" type="text" name="Nickname" value={formState.Nickname} onChange={handleChange} /></div> <div className="form-group"><label htmlFor="addrRecipientName">Recipient Name*</label><input id="addrRecipientName" type="text" name="RecipientName" value={formState.RecipientName} onChange={handleChange} required /></div> <div className="form-group"><label htmlFor="addrContactPhone">Contact Phone*</label><input id="addrContactPhone" type="tel" name="ContactPhone" value={formState.ContactPhone} onChange={handleChange} required /></div> <div className="form-group"><label htmlFor="addrLine1">Address Line 1*</label><input id="addrLine1" type="text" name="Line1" value={formState.Line1} onChange={handleChange} required /></div> <div className="form-group"><label htmlFor="addrLine2">Address Line 2</label><input id="addrLine2" type="text" name="Line2" value={formState.Line2} onChange={handleChange} /></div> <div className="form-group"><label htmlFor="addrCity">City*</label><input id="addrCity" type="text" name="City" value={formState.City} onChange={handleChange} required /></div> <div className="form-group"><label htmlFor="addrRegion">Region/State</label><input id="addrRegion" type="text" name="Region" value={formState.Region} onChange={handleChange} /></div> <div className="form-group"><label htmlFor="addrPostalCode">Postal Code*</label><input id="addrPostalCode" type="text" name="PostalCode" value={formState.PostalCode} onChange={handleChange} required /></div> <div className="form-group"><label htmlFor="addrCountry">Country*</label><input id="addrCountry" type="text" name="Country" value={formState.Country} onChange={handleChange} required /></div> <div className="form-group" style={{ display: 'flex', alignItems: 'center' }}><input type="checkbox" name="IsDefault" id="isDefaultAddress" checked={formState.IsDefault} onChange={handleChange} style={{ marginRight: '10px', width: 'auto' }} /><label htmlFor="isDefaultAddress" style={{ marginBottom: 0, display: 'inline' }}>Set as default</label></div> <div className="form-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="submit" className="primary-button">Save Address</button></div> </form> </div> </> );
+};
+
+const DashboardContent = () => {
+  const {
+    activeSection, setActiveSection, handleLogout, isLoading, error,
+    showAddressModal, setShowAddressModal, editingAddress, setEditingAddress,
+    handleSaveAddress, profile, orders, addresses
+  } = useDashboard();
+
+  const isAnySectionLoading = isLoading.profile ||
+                             (isLoading.orders && (activeSection === 'order-history' || activeSection === 'dashboard')) ||
+                             (isLoading.addresses && activeSection === 'addresses');
+
+  if (isAnySectionLoading &&
+        ( (activeSection === 'dashboard' && !profile.firstName && (!orders || !orders.length)) ||
+          (activeSection === 'order-history' && (!orders || !orders.length)) ||
+          (activeSection === 'profile-details' && !profile.firstName) ||
+          (activeSection === 'addresses' && (!addresses || !addresses.length)) )
+     ) {
+    return ( 
+        <div className="loading-overlay" style={{ color: '#fff', textAlign: 'center', paddingTop: '100px', fontSize: '1.5rem' }}>
+            <div className="loading-spinner" style={{ border: '5px solid #f3f3f3', borderTop: '5px solid #5a6d5a', borderRadius: '50%', width: '50px', height: '50px', animation: 'spin 1s linear infinite', margin: '20px auto' }}></div>
+            <p>Loading {activeSection}...</p>
+        </div>
+    );
   }
-  return (
-    <div className="dashboard-overview">
-      <h2>Welcome Back, {userProfileData.firstName || 'Adventurer'}!</h2>
-      <div className="stats-container">
-        <div className="stat-card" onClick={() => setActiveSection('order-history')} style={{cursor: 'pointer'}} aria-label={`Orders placed: ${totalOrdersPlaced}`}>
-          <h3>Orders Placed</h3> <p className="stat-number">{totalOrdersPlaced}</p>
-        </div>
-        <div className="stat-card" aria-label={`Loyalty points: ${loyaltyPoints}`}>
-          <h3>Loyalty Points</h3> <p className="stat-number">{loyaltyPoints}</p>
-        </div>
-      </div>
-      <div className="recent-activity">
-        <h3>Recent Activity</h3>
-        {recentActivities && recentActivities.length > 0 ? ( 
-            <div className="activity-list">
-            {recentActivities.map((activity, index) => (
-                <div key={activity.id || index} className="activity-item">
-                <div className={`activity-icon ${activity.type}-icon`} aria-hidden="true">{activity.type === 'order' ? '📜' : '👤'}</div>
-                <div className="activity-details"> <p>{activity.description}</p> <p className="activity-date">{new Date(activity.date).toLocaleDateString()}</p> </div>
-                </div>
-            ))}</div>
-        ) : ( <p>No recent orders to display.</p> )}
-      </div>
-      <button className="primary-button" onClick={handleShopNow} style={{marginTop: '20px'}}> Continue Your Quest (Shop Now) </button>
-    </div>
-  );
-};
-const OrderHistorySection = ({/* ... props ... */}) => { /* ... Full JSX from previous version ... */ 
-  const { userOrders, getStatusClass, handleTrackOrder, handleBuyAgain, handleCancelOrder, isLoadingData, error } = useDashboard();
-  if (isLoadingData) return <p className="loading-message">Loading order history...</p>;
-  if (error) return <p className="error-message" style={{color: 'red'}}>Error loading order history: {error}</p>;
-  if (!userOrders || userOrders.length === 0) return <p>You have no past orders to display.</p>;
-  return (
-    <div className="order-history-section">
-      <h2>Your Crafted Orders</h2>
-      <div className="orders-container">
-        {userOrders.map((order) => (
-          <div key={order.id} className="order-card">
-            <div className="order-header">
-              <div><h3>Order #{order.id}</h3><p>Ordered on: {new Date(order.date).toLocaleDateString()}</p><p>Total: ₱{(Number(order.total) || 0).toFixed(2)}</p></div>
-              <div className={`order-status ${getStatusClass(order.status)}`}>{order.status}</div>
-            </div>
-            <div className="order-items"><h4>Items:</h4>
-              {order.items && order.items.length > 0 ? order.items.map((item, index) => (
-                <div key={item.id || index} className="order-item-summary">
-                  <img src={item.image || productImages['default_placeholder.png']} alt={item.name} className="order-item-image-sm" />
-                  <span>{item.name} (Qty: {item.quantity || 1}) - ₱{(Number(item.price) || 0).toFixed(2)}</span>
-                </div>
-              )) : <p>No item details available.</p>}
-            </div>
-            <div className="order-actions">
-              <button className="secondary-button" onClick={() => handleTrackOrder(order.id)}>Track Order</button>
-              {(order.status === 'Completed' || order.status === 'Shipped') && (<button className="primary-button" onClick={() => handleBuyAgain(order.id)}>Buy Again</button>)}
-              {(order.status === 'Processing' || order.status === 'Pending') && (<button className="secondary-button" onClick={() => handleCancelOrder(order.id)}>Cancel Order</button>)}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-const ProfileSection = ({/* ... props ... */}) => { /* ... Full JSX from previous version ... */ 
-  const { userProfileData, handleSaveProfile, handleChangePassword } = useDashboard();
-  const [isEditing, setIsEditing] = useState(false);
-  const [profileForm, setProfileForm] = useState({ firstName: '', lastName: '', phone: '' });
-  const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
-  const [passwordError, setPasswordError] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState('');
-  const [profileError, setProfileError] = useState('');
-  const [profileSuccess, setProfileSuccess] = useState('');
-
-  useEffect(() => { 
-    if (userProfileData) {
-        setProfileForm({
-            firstName: userProfileData.firstName || '',
-            lastName: userProfileData.lastName || '',
-            phone: userProfileData.phone || ''
-        });
-    }
-  }, [userProfileData]);
-
-  const handleProfileInputChange = (e) => {
-    const { name, value } = e.target;
-    setProfileForm(prev => ({ ...prev, [name]: value }));
-    setProfileError(''); setProfileSuccess('');
-  };
   
-  const handleLocalSave = async () => {
-    setProfileError(''); setProfileSuccess('');
-    if (!profileForm.firstName || !profileForm.lastName) { setProfileError("First and last name are required."); return; }
-    const success = await handleSaveProfile(profileForm); 
-    if (success) { setIsEditing(false); setProfileSuccess("Profile updated!");}
-    else { setProfileError("Failed to update profile. Please try again or check console."); }
-  };
-
-  const handlePasswordFormChange = (e) => {
-    const { name, value } = e.target;
-    setPasswordData(prev => ({ ...prev, [name]: value }));
-    setPasswordError(''); setPasswordSuccess('');
-  };
-
-  const handlePasswordSubmit = async (e) => {
-    e.preventDefault();
-    setPasswordError(''); setPasswordSuccess('');
-    if (passwordData.newPassword !== passwordData.confirmPassword) { setPasswordError("New passwords do not match."); return; }
-    if (passwordData.newPassword.length < 8) { setPasswordError("New password must be at least 8 characters."); return; }
-    const success = await handleChangePassword(passwordData.currentPassword, passwordData.newPassword); 
-    if (success) {
-        setPasswordSuccess("Password changed successfully!");
-        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    } else {
-        setPasswordError("Password change failed. Please check your current password.");
-    }
-  };
-
-  return (
-    <div className="profile-section">
-      <h2>Blacksmith's Profile</h2>
-      {profileError && <p style={{color: 'red'}}>{profileError}</p>}
-      {profileSuccess && <p style={{color: 'green'}}>{profileSuccess}</p>}
-      <div className="profile-card">
-        <div className="profile-form">
-          <div className="form-group"><label htmlFor="firstNameD">First Name</label><input id="firstNameD" name="firstName" type="text" value={profileForm.firstName} onChange={handleProfileInputChange} readOnly={!isEditing} /></div>
-          <div className="form-group"><label htmlFor="lastNameD">Last Name</label><input id="lastNameD" name="lastName" type="text" value={profileForm.lastName} onChange={handleProfileInputChange} readOnly={!isEditing} /></div>
-          <div className="form-group"><label htmlFor="emailD">Email Address</label><input id="emailD" name="email" type="email" value={userProfileData.email} readOnly /></div>
-          <div className="form-group"><label htmlFor="phoneD">Phone Number</label><input id="phoneD" name="phone" type="tel" value={profileForm.phone} onChange={handleProfileInputChange} readOnly={!isEditing} /></div>
-          {isEditing ? (
-            <div className="form-actions">
-              <button className="secondary-button" onClick={() => { setIsEditing(false); setProfileForm(userProfileData || { firstName: '', lastName: '', phone: '' }); setProfileError(''); setProfileSuccess(''); }}>Cancel</button>
-              <button className="primary-button" onClick={handleLocalSave}>Save Changes</button>
-            </div>
-          ) : ( <button className="primary-button" onClick={() => setIsEditing(true)}>Edit Profile</button> )}
-          <h3 style={{marginTop: '30px'}}>Change Password</h3>
-          <form onSubmit={handlePasswordSubmit}>
-            <div className="form-group"><label htmlFor="currentPasswordD">Current Password</label><input id="currentPasswordD" name="currentPassword" type="password" placeholder="Enter current password" value={passwordData.currentPassword} onChange={handlePasswordFormChange} /></div>
-            <div className="form-group"><label htmlFor="newPasswordD">New Password</label><input id="newPasswordD" name="newPassword" type="password" placeholder="Enter new password" value={passwordData.newPassword} onChange={handlePasswordFormChange} /></div>
-            <div className="form-group"><label htmlFor="confirmPasswordD">Confirm New Password</label><input id="confirmPasswordD" name="confirmPassword" type="password" placeholder="Confirm new password" value={passwordData.confirmPassword} onChange={handlePasswordFormChange} /></div>
-            {passwordError && <p style={{color: 'red'}}>{passwordError}</p>}
-            {passwordSuccess && <p style={{color: 'green'}}>{passwordSuccess}</p>}
-            <button type="submit" className="primary-button">Update Password</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-};
-const AddressesSection = ({/* ... props ... */}) => { /* ... Full JSX from previous version ... */ 
-  const { addresses, isLoadingData, error } = useDashboard(); 
-  if (isLoadingData) return <p>Loading addresses...</p>;
-  if (error && (!addresses || addresses.length === 0)) return <p style={{color: 'red'}}>Error loading addresses: {error}</p>;
-
-  return (
-    <div className="addresses-section">
-      <h2>Delivery Strongholds</h2>
-      <button className="primary-button add-address" onClick={() => alert("Add address form/modal coming soon!")}> Forge New Delivery Point </button>
-      <div className="addresses-container">
-        {addresses && addresses.length > 0 ? addresses.map((address) => (
-          <div key={address.AddressID || address.id} className={`address-card ${address.IsDefault ? 'default-address' : ''}`}>
-            {address.IsDefault && <div className="default-badge">Default</div>}
-            <h3>{address.Nickname || `Address ${address.AddressID}`}</h3>
-            <div className="address-details">
-              <p>{address.Line1}</p> {address.Line2 && <p>{address.Line2}</p>}
-              <p>{address.City}, {address.Region} {address.PostalCode}</p> <p>{address.Country}</p>
-            </div>
-            <div className="address-actions">
-              <button className="secondary-button" onClick={() => alert(`Edit for AddressID ${address.AddressID} coming soon!`)}>Edit</button>
-            </div>
-          </div>
-        )) : <p>No delivery addresses on record.</p>}
-      </div>
-    </div>
-  );
-};
-const DashboardContent = ({/* ... props ... */}) => { /* ... Full JSX from previous version ... */ 
-  const { activeSection, setActiveSection, handleLogout, isLoadingData, totalOrdersPlaced } = useDashboard(); 
-  return (
-    <div className="ds-dashboard-layout"> 
+  return ( 
+    <div className="ds-dashboard-content">
       <div className="ds-sidebar">
         <div className="ds-nav-container">
           <ul className="ds-nav-menu">
-            <li className={activeSection === 'dashboard' ? 'active' : ''} onClick={() => setActiveSection('dashboard')}><span className="nav-icon" aria-hidden="true">⚔️</span> Dashboard</li>
-            <li className={activeSection === 'order-history' ? 'active' : ''} onClick={() => setActiveSection('order-history')}><span className="nav-icon" aria-hidden="true">📜</span> Order History</li>
-            <li className={activeSection === 'profile-details' ? 'active' : ''} onClick={() => setActiveSection('profile-details')}><span className="nav-icon" aria-hidden="true">👤</span> Profile Details</li>
+            <li className={activeSection === 'dashboard' ? 'active' : ''} onClick={() => setActiveSection('dashboard')}><span className="ds-nav-icon" aria-hidden="true">⚔️</span> Dashboard</li>
+            <li className={activeSection === 'order-history' ? 'active' : ''} onClick={() => setActiveSection('order-history')}><span className="ds-nav-icon" aria-hidden="true">📜</span> Order History</li>
+            <li className={activeSection === 'profile-details' ? 'active' : ''} onClick={() => setActiveSection('profile-details')}><span className="ds-nav-icon" aria-hidden="true">👤</span> Profile Details</li>
             <li className={activeSection === 'addresses' ? 'active' : ''} onClick={() => setActiveSection('addresses')}><span className="ds-nav-icon" aria-hidden="true">🏰</span> Addresses</li>
-            <li className="logout-btn-sidebar" onClick={handleLogout}> <span className="ds-nav-icon" aria-hidden="true">🚪</span> Logout</li>
           </ul>
         </div>
-        <div className="ds-sidebar-footer"> 
-            <img src={cloud1} alt="Decorative cloud background" className="sidebar-cloud-bg" />
-            <div className="forge-branding"><h3>MetalWorks</h3><p>Your trusted forge.</p></div>
-        </div>
+        <div className="ds-main-panel"><img src={cloud1} alt="Decorative cloud background" className="zoomed-full-image" /></div>
+        <div className="forge-branding"><h3>MetalWorks</h3><p>Your trusted forge for tools and upgrades, crafted with skill, built for adventurers.</p></div>
       </div>
-      <div className="ds-main-content-area"> 
-        {activeSection === 'dashboard' && (isLoadingData && totalOrdersPlaced === undefined ? <p>Loading Dashboard...</p> : <DashboardOverview />)}
+      <div className="ds-main-content">
+        {error[activeSection] && <p className="error-message" style={{color: 'red', marginBottom: '15px'}}>Error: {error[activeSection]}</p>}
+        {activeSection === 'dashboard' && <DashboardOverview />}
         {activeSection === 'order-history' && <OrderHistorySection />}
         {activeSection === 'profile-details' && <ProfileSection />}
         {activeSection === 'addresses' && <AddressesSection />}
       </div>
+      {showAddressModal && (<AddressFormModal currentAddress={editingAddress} onSave={handleSaveAddress} onClose={() => { setShowAddressModal(false); setEditingAddress(null); }} /> )}
     </div>
   );
 };
-const DashboardPage = ({/* ... props ... */}) => { /* ... Full JSX from previous version ... */ 
-  const { isAuthenticated, isLoadingAuth } = useAuth();
-  const navigate = useNavigate();
-  useEffect(() => {
-    if (!isLoadingAuth && !isAuthenticated) {
-      navigate('/login', { state: { message: "Please login to view your dashboard." }});
-    }
-  }, [isAuthenticated, isLoadingAuth, navigate]);
 
-  if (isLoadingAuth || !isAuthenticated) { 
-    return <div className="ds-dashboard-container"><div className="loading-overlay"><p>Verifying adventurer status...</p></div></div>;
-  }
+const DashboardOverview = () => {
+    const { handleShopNow, handleViewDetails, orders, profile, isLoading, error } = useDashboard();
+    const totalOrders = orders.length; const loyaltyPoints = totalOrders * 75;
+    const recentActivities = orders.slice(0, 2).map(order => ({ type: 'order', description: `Order #${order.id || order.OrderID} status: ${order.status}`, date: new Date(order.date || order.OrderDate).toLocaleDateString() }));
+    return ( <div className="dashboard-overview"> <h2>Welcome, {profile.firstName || 'Adventurer'}!</h2> {isLoading.orders && !orders.length && <p>Loading overview data...</p>} {error.orders && !orders.length && <p>Error loading overview: {error.orders}</p>} <div className="stats-container"> <div className="stat-card" tabIndex="0" aria-label={`Orders placed: ${totalOrders}`}><h3>Orders Placed</h3><p className="stat-number">{totalOrders}</p></div> <div className="stat-card" tabIndex="0" aria-label={`Loyalty points: ${loyaltyPoints}`}><h3>Loyalty Points</h3><p className="stat-number">{loyaltyPoints}</p></div> </div> <div className="recent-activity"><h3>Recent Activity</h3>{isLoading.orders && recentActivities.length === 0 && <p>Loading activities...</p>}{!isLoading.orders && recentActivities.length === 0 && <p>No recent activity.</p>}{recentActivities.length > 0 && (<div className="activity-list">{recentActivities.map((activity, index) => (<div key={index} className="activity-item"><div className={`activity-icon ${activity.type === 'order' ? 'order-icon' : 'profile-icon'}`} aria-hidden="true">{activity.type === 'order' ? '📜' : '👤'}</div><div className="activity-details"><p>{activity.description}</p><p className="activity-date">{activity.date}</p></div></div>))}</div>)}</div> <div className="special-offers"><h3>Exclusive Offers</h3><div className="offers-grid"><div className="offer-card" tabIndex="0"><div className="offer-badge">15% OFF</div><h4>Seasonal Sale</h4><p>Premium steel products</p><button className="primary-button" onClick={handleShopNow}>Shop Now</button></div><div className="offer-card" tabIndex="0"><div className="offer-badge">NEW</div><h4>Dragon Scale Armor</h4><p>Limited edition</p><button className="primary-button" onClick={handleViewDetails}>View Details</button></div></div></div> </div> );
+};
+
+const OrderHistorySection = () => {
+    const { orders, getStatusClass, handleTrackOrder, handleBuyAgain, handleCancelOrder, isLoading, error } = useDashboard();
+    if (isLoading.orders && !orders.length) return <p>Loading order history...</p>; if (error.orders && !orders.length) return <p>Error: {error.orders}</p>; if (!isLoading.orders && (!orders || orders.length === 0)) return <p>You have no past orders.</p>;
+    return ( <div className="order-history-section"><h2>Your Crafted Orders</h2><div className="orders-container">{orders.map((order) => (<div key={order.id || order.OrderID} className="order-card" tabIndex="0"><div className="order-header"><div><h3>Order #{(order.id || order.OrderID).toString().padStart(4, '0')}</h3><p>Ordered on: {new Date(order.date || order.OrderDate).toLocaleDateString()}</p><p>Total: ₱{(Number(order.total || order.TotalCost) || 0).toFixed(2)}</p></div><div className={`order-status ${getStatusClass(order.status)}`}>{order.status}</div></div><div className="order-items">{(order.items || []).map((item, index) => (<div key={item.ProductID || index} className="order-item"><div className="item-image" style={{ backgroundImage: `url(${item.image})`}} aria-label={`Image of ${item.name || item.ProductName}`}></div><div className="item-details"><p className="item-name">{item.name || item.ProductName}</p><p className="item-price">₱{(Number(item.price || item.UnitPrice) || 0).toFixed(2)}</p>{item.quantity && <p>Quantity: {item.quantity}</p>}</div></div>))}</div><div className="order-actions"><button className="secondary-button" onClick={() => handleTrackOrder(order.id || order.OrderID)}>Track Order</button>{order.status === 'Completed' || order.status === 'Shipped' ? (<button className="primary-button" onClick={() => handleBuyAgain(order.id || order.OrderID)}>Buy Again</button>) : (<button className="secondary-button" onClick={() => handleCancelOrder(order.id || order.OrderID)}>Cancel Order</button>)}</div></div>))}</div></div> );
+};
+const ProfileSection = () => {
+  const { profile, handleSaveProfile, handleChangePassword, handleChangeAvatar, isLoading, error } = useDashboard();
+  const [formData, setFormData] = useState({ firstName: '', lastName: '', phone: '' });
+  const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        firstName: profile.firstName || '',
+        lastName: profile.lastName || '',
+        phone: profile.phone || ''
+      });
+    }
+  }, [profile]);
+
+  const handleFormChange = (e) => { setFormData({ ...formData, [e.target.name]: e.target.value });};
+  const handlePasswordChange = (e) => { setPasswordData({ ...passwordData, [e.target.name]: e.target.value });};
+  const handleSubmitProfile = (e) => { 
+    e.preventDefault(); 
+    if (!formData.firstName || !formData.lastName) { alert("First name and last name are required."); return; }
+    handleSaveProfile(formData);
+  };
+  const handleSubmitPassword = (e) => {
+    e.preventDefault(); 
+    if (!passwordData.currentPassword || !passwordData.newPassword) { alert("Current and new password are required."); return; }
+    if (passwordData.newPassword !== passwordData.confirmPassword) { alert("New passwords do not match!"); return; }
+    if (passwordData.newPassword.length < 8) { alert("New password must be at least 8 characters long."); return;}
+    handleChangePassword({ currentPassword: passwordData.currentPassword, newPassword: passwordData.newPassword });
+    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  };
+  
+  if (isLoading.profile && !profile.firstName) return <p>Loading profile...</p>;
+  if (error.profile && !profile.firstName) return <p>Error loading profile: {error.profile}</p>;
+
   return (
-    <DashboardProvider> 
-      <div className="ds-dashboard-container">
-        <DashboardContent />
+    <div className="profile-section">
+      <h2>Blacksmith's Profile</h2>
+      <div className="profile-card">
+        <div className="profile-avatar"> {/* This div now mainly groups the display area and the button */}
+          <div className="avatar-display-area"> {/* This is the styled circular container */}
+            {profile.avatarUrl ? (
+              <img 
+                src={profile.avatarUrl} 
+                alt={`${profile.firstName || 'User'}'s Avatar`} 
+                className="avatar-image-tag" // Image fills the circular container
+              />
+            ) : (
+              <div className="avatar-placeholder-content" aria-hidden="true">
+                👤 {/* Default placeholder icon, or you can use initials, etc. */}
+              </div>
+            )}
+          </div>
+          <button 
+            className="secondary-button" 
+            onClick={handleChangeAvatar} 
+            style={{marginTop: '10px'}} // Keep or adjust as needed
+            disabled={isLoading.profile}
+          >
+            {isLoading.profile ? 'Updating...' : 'Change Avatar'}
+          </button>
+        </div>
+        <form className="profile-form" onSubmit={handleSubmitProfile}>
+          <div className="form-group"><label htmlFor="profFirstName">First Name</label><input id="profFirstName" name="firstName" type="text" value={formData.firstName} onChange={handleFormChange} /></div>
+          <div className="form-group"><label htmlFor="profLastName">Last Name</label><input id="profLastName" name="lastName" type="text" value={formData.lastName} onChange={handleFormChange} /></div>
+          <div className="form-group"><label htmlFor="profEmail">Email Address</label><input id="profEmail" type="email" value={profile.email || ''} readOnly disabled /></div>
+          <div className="form-group"><label htmlFor="profPhone">Phone Number</label><input id="profPhone" name="phone" type="tel" value={formData.phone} onChange={handleFormChange} /></div>
+          <div className="form-actions"><button type="submit" className="primary-button" disabled={isLoading.profile}>{isLoading.profile ? 'Saving...' : 'Save Profile Changes'}</button></div>
+        </form>
       </div>
-    </DashboardProvider>
+      <div className="profile-card" style={{marginTop: '30px'}}>
+        <form className="profile-form" onSubmit={handleSubmitPassword}>
+            <h3>Change Password</h3>
+            <div className="form-group"><label htmlFor="profCurrentPassword">Current Password</label><input id="profCurrentPassword" name="currentPassword" type="password" placeholder="Enter current password" value={passwordData.currentPassword} onChange={handlePasswordChange} /></div>
+            <div className="form-group"><label htmlFor="profNewPassword">New Password</label><input id="profNewPassword" name="newPassword" type="password" placeholder="Enter new password (min 8 chars)" value={passwordData.newPassword} onChange={handlePasswordChange} /></div>
+            <div className="form-group"><label htmlFor="profConfirmPassword">Confirm Password</label><input id="profConfirmPassword" name="confirmPassword" type="password" placeholder="Confirm new password" value={passwordData.confirmPassword} onChange={handlePasswordChange} /></div>
+            <div className="form-actions"><button type="submit" className="primary-button" disabled={isLoading.profile}>{isLoading.profile ? 'Changing...' : 'Change Password'}</button></div>
+        </form>
+      </div>
+    </div>
   );
 };
 
-export default DashboardPage;
+const AddressesSection = () => {
+    const { addresses, handleAddAddressClick, handleEditAddressClick, handleDeleteAddress, handleSetDefaultAddress, isLoading, error } = useDashboard();
+    if (isLoading.addresses && !addresses.length) return <p>Loading addresses...</p>; if (error.addresses && !addresses.length) return <p>Error: {error.addresses}</p>; if (!isLoading.addresses && (!addresses || addresses.length === 0)) return <p>No addresses saved.</p>;
+    return ( <div className="addresses-section"><h2>Delivery Strongholds</h2><button className="primary-button add-address" onClick={handleAddAddressClick} style={{ marginBottom: '20px' }} disabled={isLoading.addresses}>{isLoading.addresses ? "Loading..." : "Add New Address"}</button>{!isLoading.addresses && (!addresses || addresses.length === 0) && (<p>No addresses saved. Add one to get started!</p>)}<div className="addresses-container">{addresses && addresses.map((address) => (<div key={address.AddressID} className={`address-card ${address.IsDefault ? 'default-address' : ''}`} tabIndex="0">{address.IsDefault && <div className="default-badge">Default</div>}<h3>{address.Nickname || `Address`}</h3><div className="address-details"><p><strong>Recipient:</strong> {address.RecipientName}</p><p>{address.Line1}</p>{address.Line2 && <p>{address.Line2}</p>}<p>{address.City}, {address.Region && `${address.Region}, `}{address.PostalCode}</p><p>{address.Country}</p><p><strong>Phone:</strong> {address.ContactPhone}</p></div><div className="address-actions"><button className="secondary-button" onClick={() => handleEditAddressClick(address)} disabled={isLoading.addresses}>Edit</button><button className="secondary-button delete-btn" onClick={() => handleDeleteAddress(address.AddressID)} disabled={isLoading.addresses}>Delete</button>{!address.IsDefault && (<button className="secondary-button" onClick={() => handleSetDefaultAddress(address.AddressID)} disabled={isLoading.addresses}>Set as Default</button>)}</div></div>))}</div></div> );
+};
+
+const Dashboard = () => {
+  return ( <DashboardProvider><DashboardContent /></DashboardProvider> );
+};
+
+export default Dashboard;
