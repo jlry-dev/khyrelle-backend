@@ -9,7 +9,7 @@ const path = require('path');
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 5000;
-const REACT_APP_FRONTEND_URL = process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000';
+const REACT_APP_FRONTEND_URL = process.env.REACT_APP_FRONTEND_URL || 'http://localhost:5000';
 
 // --- Middleware ---
 const corsOptions = {
