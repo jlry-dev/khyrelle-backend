@@ -7,13 +7,11 @@ const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const path = require('path');
-// const jwt = require('jsonwebtoken'); // Uncomment if you implement JWT
 
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 5000;
 const REACT_APP_FRONTEND_URL = process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000';
-// const JWT_SECRET = process.env.JWT_SECRET; 
 
 // --- Middleware ---
 const corsOptions = {
@@ -48,16 +46,15 @@ dbPool.getConnection()
     console.error('Error connecting to the database:', err.stack);
   });
 
-// --- Authentication Middleware (Placeholder - Updated for stricter checking) ---
+// --- Authentication Middleware (Placeholder - Needs Real Auth for Production) ---
 const authenticateUser = (req, res, next) => {
   const userIdFromHeader = req.headers['temp-user-id'];
 
   if (userIdFromHeader && !isNaN(parseInt(userIdFromHeader))) {
     req.user = { CustomerID: parseInt(userIdFromHeader) };
     console.log(`Authenticated (temp) user: CustomerID ${req.user.CustomerID}`);
-    return next(); // User identified, proceed to the route
+    return next(); 
   } else {
-    // Define paths that strictly require user identification via this middleware
     const protectedPaths = ['/api/cart', '/api/user', '/api/orders'];
     const requiresAuth = protectedPaths.some(p => req.path.startsWith(p));
 
@@ -66,7 +63,6 @@ const authenticateUser = (req, res, next) => {
       return res.status(401).json({ message: "User not identified or invalid user ID. Please send a valid 'temp-user-id' header or ensure you are logged in." });
     }
     
-    // For other paths that might use this middleware optionally or are public
     console.warn(`WARN: No valid 'temp-user-id' header for ${req.path}. Proceeding without setting req.user from header for this route (if route doesn't strictly require it).`);
     return next();
   }
@@ -75,7 +71,7 @@ const authenticateUser = (req, res, next) => {
 
 // --- API Routes ---
 
-// AUTH Routes (Signup, Login) - These should NOT use authenticateUser middleware before their own logic
+// AUTH Routes (Signup, Login) - These should NOT use authenticateUser middleware here.
 app.post('/api/auth/signup', async (req, res) => { 
   const { firstName, lastName, userEmail, password } = req.body;
   if (!firstName || !lastName || !userEmail || !password) {
@@ -130,12 +126,9 @@ app.post('/api/auth/login', async (req, res) => {
       email: user.userEmail,
       phone: user.PhoneNumber || '' 
     };
+    // IMPORTANT: Replace "fake-auth-token..." with actual JWT generation
     const token = "fake-auth-token-replace-with-real-jwt"; 
-    res.status(200).json({
-      message: 'Login successful!',
-      user: userDataForFrontend,
-      token: token 
-    });
+    res.status(200).json({ message: 'Login successful!', user: userDataForFrontend, token: token });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'An error occurred during login. Please try again.' });
@@ -144,7 +137,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// PRODUCT Routes (Public - do not need authenticateUser)
+// PRODUCT Routes (Public)
 app.get('/api/products', async (req, res) => { 
   let connection;
   try {
@@ -175,20 +168,44 @@ app.get('/api/products/:id', async (req, res) => {
     if (connection) connection.release();
   }
 });
+app.get('/api/products/search', async (req, res) => {
+  const searchTerm = req.query.q; 
+  if (!searchTerm || typeof searchTerm !== 'string' || searchTerm.trim() === '') {
+    return res.status(400).json({ message: 'Search term is required.' });
+  }
+  let connection;
+  try {
+    connection = await dbPool.getConnection();
+    const query = `
+      SELECT * FROM products 
+      WHERE Name LIKE ? OR Description LIKE ? OR ItemType LIKE ? OR Material LIKE ?
+      ORDER BY Name ASC
+    `;
+    const searchPattern = `%${searchTerm.trim()}%`; 
+    const [results] = await connection.execute(query, [searchPattern, searchPattern, searchPattern, searchPattern]);
+    console.log(`Search for "${searchTerm}" returned ${results.length} products.`);
+    res.status(200).json(results); 
+  } catch (error) {
+    console.error('Error during product search:', error);
+    res.status(500).json({ message: 'Failed to search for products.' });
+  } finally {
+    if (connection) connection.release();
+  }
+});
 
 // ORDER Route (Requires authentication)
 app.post('/api/orders', authenticateUser, async (req, res) => { 
-  // After authenticateUser, req.user should be set if temp-user-id was valid.
-  // If not, authenticateUser would have sent a 401 for this path.
   if (!req.user || !req.user.CustomerID) {
     return res.status(401).json({ message: "User authentication failed for order placement." });
   }
   const customerId = req.user.CustomerID; 
-  
-  const { items: itemsInPayload, paymentMethod, finalTotal, isRushOrder } = req.body;
+  const { items: itemsInPayload, paymentMethod, finalTotal, isRushOrder, messageForSeller, deliveryAddress } = req.body;
 
   if (!itemsInPayload || itemsInPayload.length === 0) return res.status(400).json({ message: 'Order must contain at least one item.' });
   if (!paymentMethod || finalTotal === undefined) return res.status(400).json({ message: 'Payment method and total amount are required.' });
+  if (!deliveryAddress || !deliveryAddress.line1 || !deliveryAddress.city || !deliveryAddress.postalCode || !deliveryAddress.country || !deliveryAddress.recipientName || !deliveryAddress.contactPhone) {
+    return res.status(400).json({ message: 'Complete delivery address including recipient name and phone is required.' });
+  }
 
   let connection;
   try {
@@ -197,11 +214,16 @@ app.post('/api/orders', authenticateUser, async (req, res) => {
     const orderDate = new Date().toISOString().slice(0, 10); 
     const rushOrderText = isRushOrder ? '1' : '0';
     const approvalStatus = 'Pending'; 
+    
     const [orderResult] = await connection.execute(
-      'INSERT INTO `order` (`CustomerID`, `OrderDate`, `RushOrder`, `ApprovalStatus`, `TotalCost`) VALUES (?, ?, ?, ?, ?)',
-      [customerId, orderDate, rushOrderText, approvalStatus, finalTotal]
+      'INSERT INTO `order` (`CustomerID`, `OrderDate`, `RushOrder`, `ApprovalStatus`, `TotalCost`, `OrderNotes`, `ShippingRecipientName`, `ShippingAddressLine1`, `ShippingAddressLine2`, `ShippingCity`, `ShippingPostalCode`, `ShippingCountry`, `ShippingContactPhone`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [ customerId, orderDate, rushOrderText, approvalStatus, finalTotal, messageForSeller || null, 
+        deliveryAddress.recipientName, deliveryAddress.line1, deliveryAddress.line2 || null, 
+        deliveryAddress.city, deliveryAddress.postalCode, deliveryAddress.country, deliveryAddress.contactPhone
+      ]
     );
     const newOrderId = orderResult.insertId;
+
     for (const cartItem of itemsInPayload) {
       const itemTotalCost = (Number(cartItem.unitPrice) || 0) * (cartItem.quantity || 1);
       const placeholderPricingTierID = 0; 
@@ -210,12 +232,14 @@ app.post('/api/orders', authenticateUser, async (req, res) => {
         [newOrderId, placeholderPricingTierID, cartItem.unitPrice, itemTotalCost, cartItem.quantity, cartItem.productId]
       );
     }
+    
     const paymentAddressPlaceholder = "Order Payment - Address N/A"; 
-    const placeholderOriginalPaymentID = newOrderId; // Using newOrderId for PaymentID in paymentmethod table
+    const placeholderOriginalPaymentID = newOrderId; 
     await connection.execute(
       'INSERT INTO `paymentmethod` (`CustomerID`, `OrderID`, `PaymentID`, `Details`, `Address`) VALUES (?, ?, ?, ?, ?)',
       [customerId, newOrderId, placeholderOriginalPaymentID, paymentMethod, paymentAddressPlaceholder] 
     );
+
     await connection.commit();
     res.status(201).json({ 
       message: 'Order placed successfully!', 
@@ -227,55 +251,12 @@ app.post('/api/orders', authenticateUser, async (req, res) => {
   } catch (error) {
     if (connection) await connection.rollback();
     console.error('Error placing order:', error); 
-    res.status(500).json({ message: 'Failed to place order. Please check server logs.' });
+    res.status(500).json({ message: 'Failed to place order. Please check server logs for specific database errors.' });
   } finally {
     if (connection) connection.release();
   }
 });
 
-// Product Search Route
-
-// Product Search Route (Refined to always return 200 with array)
-app.get('/api/products/search', async (req, res) => {
-  const searchTerm = req.query.q; 
-  if (!searchTerm || typeof searchTerm !== 'string' || searchTerm.trim() === '') {
-    return res.status(400).json({ message: 'Search term is required.' });
-  }
-
-  let connection;
-  try {
-    connection = await dbPool.getConnection();
-    const query = `
-      SELECT
-    ProductID,
-    Name,
-    Description,
-    ItemType,
-    Material,
-    Stock
-FROM
-    products
-WHERE
-    Name LIKE ? OR
-    Description LIKE ? OR
-    ItemType LIKE ? OR
-    Material LIKE ?;
-    `;
-    const searchPattern = `%${searchTerm.trim()}%`; 
-    const [results] = await connection.execute(query, [searchPattern, searchPattern, searchPattern, searchPattern]);
-    
-    console.log(`Search for "${searchTerm}" returned ${results.length} products.`);
-    // Always return 200 OK. If no results, it's an empty array.
-    // The frontend will handle displaying "No products found".
-    res.status(200).json(results); 
-
-  } catch (error) {
-    console.error('Error during product search:', error);
-    res.status(500).json({ message: 'Failed to search for products.' });
-  } finally {
-    if (connection) connection.release();
-  }
-});
 
 // USER-SPECIFIC CART API Routes (all use authenticateUser)
 app.get('/api/cart', authenticateUser, async (req, res) => { 
@@ -317,7 +298,7 @@ app.post('/api/cart/items', authenticateUser, async (req, res) => {
         if (existingItems.length > 0) {
             const existingItem = existingItems[0]; finalQuantity = existingItem.Quantity + numQuantity; 
             cartItemId = existingItem.ID;
-            await connection.execute('UPDATE `cart_items` SET `Quantity` = ? WHERE `ID` = ?', [finalQuantity, cartItemId]);
+            await connection.execute('UPDATE `cart_items` SET `Quantity` = ? WHERE `ID` = ? AND `CustomerID` = ?', [finalQuantity, cartItemId, customerId]);
             actionMessage = 'Cart item quantity updated.';
         } else {
             const [result] = await connection.execute(
@@ -330,7 +311,7 @@ app.post('/api/cart/items', authenticateUser, async (req, res) => {
         const [itemDetails] = await connection.execute(
              `SELECT ci.ID as CartItemID, ci.ProductID, ci.Quantity, ci.Price as UnitPrice, ci.RushOrder,
                      p.Name, p.ImagePath, p.Description, p.ItemType, p.Material, p.Stock
-              FROM cart_items ci JOIN products p ON ci.ProductID = p.ProductID WHERE ci.ID = ?`, [cartItemId]
+              FROM cart_items ci JOIN products p ON ci.ProductID = p.ProductID WHERE ci.ID = ? AND ci.CustomerID = ?`, [cartItemId, customerId]
         );
         if (itemDetails.length === 0) throw new Error("Failed to retrieve item details after cart operation.");
         res.status(statusCode).json({ message: actionMessage, item: itemDetails[0] });
@@ -357,7 +338,7 @@ app.put('/api/cart/items/:cartItemId', authenticateUser, async (req, res) => {
         const [updatedItemDetails] = await connection.execute(
              `SELECT ci.ID as CartItemID, ci.ProductID, ci.Quantity, ci.Price as UnitPrice, ci.RushOrder,
                      p.Name, p.ImagePath, p.Description, p.ItemType, p.Material, p.Stock
-              FROM cart_items ci JOIN products p ON ci.ProductID = p.ProductID WHERE ci.ID = ?`, [cartItemId]
+              FROM cart_items ci JOIN products p ON ci.ProductID = p.ProductID WHERE ci.ID = ? AND ci.CustomerID = ?`, [cartItemId, customerId]
         );
         res.status(200).json({ message: 'Cart item quantity updated.', item: updatedItemDetails[0] });
     } catch (error) {
@@ -503,12 +484,11 @@ app.delete('/api/user/addresses/:addressId', authenticateUser, (req, res) => res
 app.put('/api/user/addresses/:addressId/default', authenticateUser, (req, res) => res.status(501).json({message: "Set default address not implemented"}));
 
 
-// --- Default Route ---
+// --- Default Route & Start Server ---
 app.get('/', (req, res) => {
   res.send('Welcome to the Metalworks API!');
 });
 
-// --- Start the Server ---
 app.listen(PORT, () => {
   console.log(`Backend server is running on http://localhost:${PORT}`);
   console.log(`Accepting requests from: ${REACT_APP_FRONTEND_URL}`);
