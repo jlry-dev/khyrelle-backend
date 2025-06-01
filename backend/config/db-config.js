@@ -6,11 +6,11 @@ const dbPool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'metalworks',
+  database: process.env.DB_NAME || 'metalworks', // Using 'metalworks' as per this file
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  decimalNumbers: true 
+  decimalNumbers: true
 });
 
 dbPool.getConnection()

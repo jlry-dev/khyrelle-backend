@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const dbPool = require("../config/db-config")
 
-const getCart = async (req, res) => { 
+const getCart = async (req, res) => {
     if (!req.user || !req.user.CustomerID) return res.status(401).json({ message: "User not properly authenticated for cart." });
     const customerId = req.user.CustomerID;
     let connection;
@@ -21,7 +21,7 @@ const getCart = async (req, res) => {
     } finally { if (connection) connection.release(); }
 }
 
-const deleteCart = async (req, res) => { 
+const deleteCart = async (req, res) => {
     if (!req.user || !req.user.CustomerID) return res.status(401).json({ message: "User not properly authenticated for cart." });
     const customerId = req.user.CustomerID;
     let connection;
@@ -35,7 +35,7 @@ const deleteCart = async (req, res) => {
     } finally { if (connection) connection.release(); }
 }
 
-const postCartItem = async (req, res) => { 
+const postCartItem = async (req, res) => {
     if (!req.user || !req.user.CustomerID) return res.status(401).json({ message: "User not properly authenticated for cart." });
     const customerId = req.user.CustomerID;
     const { productId, quantity, unitPrice, rushOrder } = req.body;
@@ -54,9 +54,9 @@ const postCartItem = async (req, res) => {
         );
         let cartItemId; let finalQuantity = numQuantity; let actionMessage = ''; let statusCode = 200;
         if (existingItems.length > 0) {
-            const existingItem = existingItems[0]; finalQuantity = existingItem.Quantity + numQuantity; 
+            const existingItem = existingItems[0]; finalQuantity = existingItem.Quantity + numQuantity;
             cartItemId = existingItem.ID;
-            await connection.execute('UPDATE `cart_items` SET `Quantity` = ? WHERE `ID` = ?', [finalQuantity, cartItemId]);
+            await connection.execute('UPDATE `cart_items` SET `Quantity` = ? WHERE `ID` = ? AND `CustomerID` = ?', [finalQuantity, cartItemId, customerId]);
             actionMessage = 'Cart item quantity updated.';
         } else {
             const [result] = await connection.execute(
@@ -69,7 +69,7 @@ const postCartItem = async (req, res) => {
         const [itemDetails] = await connection.execute(
              `SELECT ci.ID as CartItemID, ci.ProductID, ci.Quantity, ci.Price as UnitPrice, ci.RushOrder,
                      p.Name, p.ImagePath, p.Description, p.ItemType, p.Material, p.Stock
-              FROM cart_items ci JOIN products p ON ci.ProductID = p.ProductID WHERE ci.ID = ?`, [cartItemId]
+              FROM cart_items ci JOIN products p ON ci.ProductID = p.ProductID WHERE ci.ID = ? AND ci.CustomerID = ?`, [cartItemId, customerId]
         );
         if (itemDetails.length === 0) throw new Error("Failed to retrieve item details after cart operation.");
         res.status(statusCode).json({ message: actionMessage, item: itemDetails[0] });
@@ -80,10 +80,10 @@ const postCartItem = async (req, res) => {
     } finally { if (connection) connection.release(); }
 }
 
-const updateCartItem = async (req, res) => { 
+const updateCartItem = async (req, res) => {
     if (!req.user || !req.user.CustomerID) return res.status(401).json({ message: "User not properly authenticated for cart." });
     const customerId = req.user.CustomerID;
-    const { cartItemId } = req.params; 
+    const { cartItemId } = req.params;
     const { quantity } = req.body;
     if (quantity === undefined || parseInt(quantity) <= 0) return res.status(400).json({ message: 'Valid quantity is required.' });
     let connection;
@@ -97,7 +97,7 @@ const updateCartItem = async (req, res) => {
         const [updatedItemDetails] = await connection.execute(
              `SELECT ci.ID as CartItemID, ci.ProductID, ci.Quantity, ci.Price as UnitPrice, ci.RushOrder,
                      p.Name, p.ImagePath, p.Description, p.ItemType, p.Material, p.Stock
-              FROM cart_items ci JOIN products p ON ci.ProductID = p.ProductID WHERE ci.ID = ?`, [cartItemId]
+              FROM cart_items ci JOIN products p ON ci.ProductID = p.ProductID WHERE ci.ID = ? AND ci.CustomerID = ?`, [cartItemId, customerId]
         );
         res.status(200).json({ message: 'Cart item quantity updated.', item: updatedItemDetails[0] });
     } catch (error) {
@@ -106,7 +106,7 @@ const updateCartItem = async (req, res) => {
     } finally { if (connection) connection.release(); }
 }
 
-const deleteCartItem = async (req, res) => { 
+const deleteCartItem = async (req, res) => {
     if (!req.user || !req.user.CustomerID) return res.status(401).json({ message: "User not properly authenticated for cart." });
     const customerId = req.user.CustomerID;
     const { cartItemId } = req.params;

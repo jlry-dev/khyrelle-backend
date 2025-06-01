@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const dbPool = require("../config/db-config")
 
-const getProducts = async (req, res) => { 
+const getProducts = async (req, res) => {
   let connection;
   try {
     connection = await dbPool.getConnection();
@@ -16,7 +16,7 @@ const getProducts = async (req, res) => {
   }
 }
 
-const getProduct = async (req, res) => { 
+const getProduct = async (req, res) => {
   const { id } = req.params;
   let connection;
   try {
@@ -35,38 +35,46 @@ const getProduct = async (req, res) => {
 }
 
 const getSearchProducts = async (req, res) => {
-  const searchTerm = req.query.q; 
+  const searchTerm = req.query.q;
+  const page = 1; 
+  const limit = 100; 
+  const offset = (page - 1) * limit;
+
   if (!searchTerm || typeof searchTerm !== 'string' || searchTerm.trim() === '') {
     return res.status(400).json({ message: 'Search term is required.' });
   }
-
   let connection;
   try {
     connection = await dbPool.getConnection();
-    const query = `
-      SELECT
-    ProductID,
-    Name,
-    Description,
-    ItemType,
-    Material,
-    Stock
-FROM
-    products
-WHERE
-    Name LIKE ? OR
-    Description LIKE ? OR
-    ItemType LIKE ? OR
-    Material LIKE ?;
-    `;
-    const searchPattern = `%${searchTerm.trim()}%`; 
-    const [results] = await connection.execute(query, [searchPattern, searchPattern, searchPattern, searchPattern]);
-    
-    console.log(`Search for "${searchTerm}" returned ${results.length} products.`);
-    // Always return 200 OK. If no results, it's an empty array.
-    // The frontend will handle displaying "No products found".
-    res.status(200).json(results); 
+    const searchPattern = `%${searchTerm.trim()}%`;
 
+    const countQuery = `
+      SELECT COUNT(*) as total FROM products 
+      WHERE Name LIKE ? OR Description LIKE ? OR ItemType LIKE ? OR Material LIKE ?
+    `;
+    const [countResult] = await connection.execute(countQuery, [searchPattern, searchPattern, searchPattern, searchPattern]);
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    const resultsQuery = `
+      SELECT * FROM products 
+      WHERE Name LIKE ? OR Description LIKE ? OR ItemType LIKE ? OR Material LIKE ?
+      ORDER BY Name ASC
+      LIMIT ? OFFSET ? 
+    `;
+    const [results] = await connection.execute(resultsQuery, [searchPattern, searchPattern, searchPattern, searchPattern, limit, offset]);
+
+    console.log(`Search for "${searchTerm}" returned ${results.length} products (total matching: ${total}).`);
+
+    res.status(200).json({
+      results: results,
+      pagination: {
+        page: page,
+        limit: limit,
+        total: total,
+        totalPages: totalPages
+      }
+    });
   } catch (error) {
     console.error('Error during product search:', error);
     res.status(500).json({ message: 'Failed to search for products.' });

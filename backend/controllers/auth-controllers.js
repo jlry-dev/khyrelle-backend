@@ -1,9 +1,12 @@
 require('dotenv').config();
 const bcrypt = require('bcrypt');
+// const jwt = require('jsonwebtoken'); // Uncomment if you implement JWT
 
 const dbPool = require("../config/db-config")
 
-const signUp = async (req, res) => { 
+// const JWT_SECRET = process.env.JWT_SECRET;
+
+const signUp = async (req, res) => {
   const { firstName, lastName, userEmail, password } = req.body;
   if (!firstName || !lastName || !userEmail || !password) {
     return res.status(400).json({ message: 'All fields are required.' });
@@ -33,7 +36,7 @@ const signUp = async (req, res) => {
   }
 }
 
-const logIn = async (req, res) => { 
+const logIn = async (req, res) => {
   const { userEmail, password } = req.body;
   if (!userEmail || !password) {
     return res.status(400).json({ message: 'Email and password are required.' });
@@ -43,26 +46,23 @@ const logIn = async (req, res) => {
     connection = await dbPool.getConnection();
     const [rows] = await connection.execute('SELECT `CustomerID`, `firstName`, `lastName`, `userEmail`, `password_hash`, `PhoneNumber` FROM `customer` WHERE `userEmail` = ?', [userEmail]);
     if (rows.length === 0) {
-      return res.status(401).json({ message: 'Invalid email or password.' }); 
+      return res.status(401).json({ message: 'Invalid email or password.' });
     }
-    const user = rows[0]; 
+    const user = rows[0];
     const passwordIsValid = await bcrypt.compare(password, user.password_hash);
     if (!passwordIsValid) {
-      return res.status(401).json({ message: 'Invalid email or password.' }); 
+      return res.status(401).json({ message: 'Invalid email or password.' });
     }
     const userDataForFrontend = {
-      CustomerID: user.CustomerID, 
+      CustomerID: user.CustomerID,
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.userEmail,
-      phone: user.PhoneNumber || '' 
+      phone: user.PhoneNumber || ''
     };
-    const token = "fake-auth-token-replace-with-real-jwt"; 
-    res.status(200).json({
-      message: 'Login successful!',
-      user: userDataForFrontend,
-      token: token 
-    });
+    // IMPORTANT: Replace "fake-auth-token..." with actual JWT generation
+    const token = "fake-auth-token-replace-with-real-jwt";
+    res.status(200).json({ message: 'Login successful!', user: userDataForFrontend, token: token });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'An error occurred during login. Please try again.' });

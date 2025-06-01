@@ -11,19 +11,21 @@ userRouter.use(authenticateUser)
 // Route prefix /api/user
 userRouter.get('/profile', controllers.getProfile)
 userRouter.put('/profile', controllers.updateProfile)
+userRouter.put('/avatar', controllers.updateAvatar)
 userRouter.put('/password', controllers.updatePassword) // Changed from POST to PUT
 
-/* 
+// ADDRESS API Routes
+userRouter.get('/addresses', controllers.getAddresses);
+userRouter.post('/addresses', controllers.postAddresses);
+userRouter.put('/addresses/:addressId', controllers.updateAddress);
+userRouter.delete('/addresses/:addressId', controllers.deleteAddress);
+userRouter.put('/addresses/:addressId/default', controllers.updateAddressDefault);
+
+
+/* NOTE:
     Moved route /api/user/orders to /api/orders
 */
 
-
-// ADDRESS API Routes (Placeholders - require customer_addresses table and full implementation)
-userRouter.get('/addresses', (req, res) => res.status(501).json({message: "Addresses GET not implemented"}));
-userRouter.post('/addresses', (req, res) => res.status(501).json({message: "Addresses POST not implemented"}));
-userRouter.put('/addresses/:addressId', (req, res) => res.status(501).json({message: "Addresses PUT not implemented"}));
-userRouter.delete('/addresses/:addressId', (req, res) => res.status(501).json({message: "Addresses DELETE not implemented"}));
-userRouter.put('/addresses/:addressId/default', (req, res) => res.status(501).json({message: "Set default address not implemented"}));
 
 
 module.exports = userRouter
